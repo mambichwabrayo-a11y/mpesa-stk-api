@@ -1,4 +1,3 @@
-// api/callback.js - FIXED COLUMN NAMES
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
@@ -10,33 +9,41 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return;
 
   const data = req.body;
-  console.log('=== PAYHERO CALLBACK DATA ===');
-  console.log(JSON.stringify(data, null, 2));
-  console.log('=============================');
+  console.log('PAYHERO CALLBACK:', JSON.stringify(data));
 
+  // FIX #1: TOA DATA NDANI YA 'response'
+  const payment = data.response;
+  
+  if (!payment) {
+    console.log('No payment object in callback');
+    return;
+  }
+  
   try {
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
     );
 
-    // NIME-BADILISHA MAJINA KUFANANA NA TABLE YAKO
+    console.log('SAVING TO SUPABASE:', payment);
+
+    // FIX #2: TUMIA MAJINA KUBWA KAMA PAYHERO
     const { data: result, error } = await supabase.from('payments').insert({
-      amount: data.amount,
-      phone: data.phone_number,
-      mpesa_receipt: data.MpesaReceiptNumber, // BADILISHA HAPA
-      status: data.status,
-      reference: data.reference,
+      amount: payment.Amount,
+      phone: payment.Phone,
+      mpesa_receipt: payment.MpesaReceiptNumber,
+      status: payment.Status,
+      reference: payment.ExternalReference,
       raw_data: data
     });
 
     if (error) {
-      console.error('Supabase INSERT ERROR:', error);
+      console.error('SUPABASE ERROR:', JSON.stringify(error));
     } else {
-      console.log('Payment saved successfully:', result);
+      console.log('SUPABASE SUCCESS:', result);
     }
 
   } catch (error) {
-    console.error('Supabase CONNECTION ERROR:', error.message);
+    console.error('CONNECTION ERROR:', error.message);
   }
 }
