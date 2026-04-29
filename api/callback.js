@@ -20,7 +20,6 @@ export default async function handler(req, res) {
   
   console.log('SAVING TO SUPABASE:', payment);
   
-  // === ANZA KUBADILISHA HAPA ===
   try {
     console.log('BEFORE INSERT');
     
@@ -30,12 +29,12 @@ export default async function handler(req, res) {
     );
 
     const insertResponse = await supabase
-      .from('payments') // ← HII NDIO UTAIBADILISHA UKIPATA JINA SAHIHI
+      .from('payments')
       .insert({
         amount: payment.Amount,
         phone: payment.Phone,
         mpesa_receipt: payment.MpesaReceiptNumber,
-        reference: payment.ExternalReference,
+        reference: payment.ExternalReference
       })
       .select();
 
@@ -53,5 +52,4 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('CRASH CAUGHT:', err.name, err.message);
   }
-  // === MALIZA KUBADILISHA HAPA ===
 }
