@@ -6,7 +6,6 @@ export default async function handler(req, res) {
   
   console.log('CALLBACK IMEFIKA:', JSON.stringify(req.body));
   
-  // 2. Chukua data
   if (req.method !== 'POST') return;
   
   const data = req.body;
@@ -14,7 +13,6 @@ export default async function handler(req, res) {
   
   console.log('PAYMENT DATA:', payment);
   
-  // 3. Hakikisha payment iko sawa
   if (!payment?.MpesaReceiptNumber) {
     console.log('HAKUNA RECEIPT - INARUDI');
     return;
@@ -22,32 +20,40 @@ export default async function handler(req, res) {
   
   console.log('SAVING TO SUPABASE:', payment);
   
-  // 4. HAPA NDIPO createClient INAKUWA
+  // === ANZA KUBADILISHA HAPA ===
   try {
-    console.log('URL IKO:', process.env.SUPABASE_URL ? 'YES' : 'NO');
-    console.log('KEY IKO:', process.env.SUPABASE_ANON_KEY ? 'YES' : 'NO');
+    console.log('BEFORE INSERT');
     
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
     );
 
-    const { data: result, error } = await supabase.from('payments').insert({
-      amount: payment.Amount,
-      phone: payment.Phone,
-      mpesa_receipt: payment.MpesaReceiptNumber,
-      status: payment.Status,
-      reference: payment.ExternalReference,
-      raw_data: data
-    }).select();
+    const insertResponse = await supabase
+      .from('payments') // ← HII NDIO UTAIBADILISHA UKIPATA JINA SAHIHI
+      .insert({
+        amount: payment.Amount,
+        phone: payment.Phone,
+        mpesa_receipt: payment.MpesaReceiptNumber,
+        status: payment.Status,
+        reference: payment.ExternalReference,
+        raw_data: data
+      })
+      .select();
 
-    console.log('INSERT RESULT:', result);
-    console.log('INSERT ERROR:', JSON.stringify(error));
-    
-    if (error) console.error('SUPABASE ERROR FULL:', error);
-    else console.log('SAVED SUCCESS:', payment.MpesaReceiptNumber);
+    console.log('INSERT RESPONSE FULL:', JSON.stringify(insertResponse, null, 2));
 
-  } catch (error) {
-    console.error('CRASH ERROR:', error.message);
+    if (insertResponse.error) {
+      console.error('ERROR CODE:', insertResponse.error.code);
+      console.error('ERROR MESSAGE:', insertResponse.error.message);
+      console.error('ERROR DETAILS:', insertResponse.error.details);
+      console.error('ERROR HINT:', insertResponse.error.hint);
+    } else {
+      console.log('SAVED SUCCESS:', insertResponse.data);
+    }
+
+  } catch (err) {
+    console.error('CRASH CAUGHT:', err.name, err.message);
   }
+  // === MALIZA KUBADILISHA HAPA ===
 }
