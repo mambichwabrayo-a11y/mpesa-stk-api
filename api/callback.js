@@ -1,46 +1,17 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-)
-
+// api/callback.js - VERSION SAFI
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  try {
-    const data = req.body
-    
-    // Kama payment haikufaulu, achana nayo
-    if (data.status !== 'Success') {
-      console.log('Payment failed:', data.Reference)
-      return res.status(200).json({ message: 'Payment not successful' })
-    }
+  const data = req.body;
+  
+  console.log('=== PAYHERO CALLBACK ===');
+  console.log(data);
+  console.log('========================');
 
-    // Save kwa Supabase
-    const { error } = await supabase
-      .from('payments')
-      .insert({
-        mpesa_receipt: data.MpesaReceiptNumber,
-        amount: data.Amount,
-        phone: data.Phone,
-        reference: data.Reference,
-        status: data.status,
-        raw_data: data
-      })
-
-    if (error) {
-      console.error('Supabase error:', error)
-      return res.status(500).json({ error: 'Failed to save' })
-    }
-
-    console.log('Payment saved:', data.MpesaReceiptNumber)
-    return res.status(200).json({ message: 'Payment saved' })
-
-  } catch (err) {
-    console.error('Error:', err)
-    return res.status(500).json({ error: 'Server error' })
-  }
+  res.status(200).json({ 
+    ResultCode: 0, 
+    ResultDesc: 'Received' 
+  });
 }
