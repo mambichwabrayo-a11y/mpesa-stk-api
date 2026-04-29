@@ -1,44 +1,42 @@
-// api/callback.js - VERSION SAFI NA SUPABASE + ERROR HANDLING
+// api/callback.js - FIXED COLUMN NAMES
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
-  // 1. Jibu PayHero haraka kwanza - MUHIMU SANA
   res.status(200).json({ 
     ResultCode: 0, 
     ResultDesc: 'Received' 
   });
 
-  // 2. Kama sio POST, toka tu
   if (req.method !== 'POST') return;
 
   const data = req.body;
-  console.log('=== PAYHERO CALLBACK ===');
-  console.log(data);
-  console.log('========================');
+  console.log('=== PAYHERO CALLBACK DATA ===');
+  console.log(JSON.stringify(data, null, 2));
+  console.log('=============================');
 
-  // 3. Jaribu ku-save kwa Supabase, lakini isicrash
   try {
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
     );
 
-    const { error } = await supabase.from('payments').insert({
+    // NIME-BADILISHA MAJINA KUFANANA NA TABLE YAKO
+    const { data: result, error } = await supabase.from('payments').insert({
       amount: data.amount,
       phone: data.phone_number,
-      mpesa_code: data.MpesaReceiptNumber,
+      mpesa_receipt: data.MpesaReceiptNumber, // BADILISHA HAPA
       status: data.status,
       reference: data.reference,
       raw_data: data
     });
 
     if (error) {
-      console.error('Supabase insert error:', error.message);
+      console.error('Supabase INSERT ERROR:', error);
     } else {
-      console.log('Payment saved to Supabase successfully');
+      console.log('Payment saved successfully:', result);
     }
 
   } catch (error) {
-    console.error('Supabase connection error:', error.message);
+    console.error('Supabase CONNECTION ERROR:', error.message);
   }
 }
