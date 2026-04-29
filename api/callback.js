@@ -35,9 +35,7 @@ export default async function handler(req, res) {
         amount: payment.Amount,
         phone: payment.Phone,
         mpesa_receipt: payment.MpesaReceiptNumber,
-        status: payment.Status,
         reference: payment.ExternalReference,
-        raw_data: data
       })
       .select();
 
