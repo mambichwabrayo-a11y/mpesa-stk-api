@@ -28,20 +28,26 @@ export default async function handler(req, res) {
     console.log('SAVING TO SUPABASE:', payment);
 
     // FIX #2: TUMIA MAJINA KUBWA KAMA PAYHERO
-    const { data: result, error } = await supabase.from('payments').insert({
-      amount: payment.Amount,
-      phone: payment.Phone,
-      mpesa_receipt: payment.MpesaReceiptNumber,
-      status: payment.Status,
-      reference: payment.ExternalReference,
-      raw_data: data
-    });
+   const { data: result, error } = await supabase
+  .from('payments')
+  .insert({
+    amount: payment.Amount,
+    phone: payment.Phone,
+    mpesa_receipt: payment.MpesaReceiptNumber,
+    status: payment.Status,
+    reference: payment.ExternalReference,
+    raw_data: data
+  })
+  .select(); // ONGEZA HII
 
-    if (error) {
-      console.error('SUPABASE ERROR:', JSON.stringify(error));
-    } else {
-      console.log('SUPABASE SUCCESS:', result);
-    }
+console.log('INSERT RESULT:', result);
+console.log('INSERT ERROR:', error);
+
+if (error) {
+  console.error('SUPABASE ERROR FULL:', JSON.stringify(error));
+} else {
+  console.log('SAVED SUCCESS:', payment.MpesaReceiptNumber);
+}
 
   } catch (error) {
     console.error('CONNECTION ERROR:', error.message);
