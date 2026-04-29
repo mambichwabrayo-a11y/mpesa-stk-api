@@ -42,7 +42,8 @@ export default async function handler(req, res) {
     const data = await response.json();
     
     if (!response.ok) {
-      return res.status(400).json({ success: false, error: data.message || 'PayHero error' });
+      return res.status(400).json({ success: false, error: data.message || data.error || JSON.stringify(data) });
+
     }
     
     return res.status(200).json({ success: true, data: data });
