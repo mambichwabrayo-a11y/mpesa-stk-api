@@ -1,68 +1,64 @@
 export default async function handler(req, res) {
-  // 1. Jibu PayHero haraka sana
   res.status(200).json({ ResultCode: 0, ResultDesc: 'Received' });
   
   console.log('=== CALLBACK START ===');
+  console.log('METHOD:', req.method);
+  console.log('BODY KAMILI:', JSON.stringify(req.body, null, 2));
   
   try {
-    // 2. Chukua data kutoka kwa PayHero
-    const payment = req.body.response;
+    const body = req.body;
     
-    // 3. Kama hakuna receipt, toka
+    // PayHero huweka data kwa 'response' ama direct kwa body
+    const payment = body.response || body;
+    
+    console.log('PAYMENT OBJECT:', JSON.stringify(payment, null, 2));
+    
+    // Check kama hii ni callback ya Success
     if (!payment?.MpesaReceiptNumber) {
-      console.log('HAKUNA MPESA RECEIPT - INARUDI');
+      console.log('HAKUNA MPESA RECEIPT - HII SIO CALLBACK YA MALIPO');
+      console.log('ResultCode:', payment?.ResultCode);
+      console.log('ResultDesc:', payment?.ResultDesc);
       return;
     }
     
-    console.log('ENV CHECK:', {
-      url: process.env.SUPABASE_URL ? 'IPO' : 'HAKUNA',
-      key: process.env.SUPABASE_ANON_KEY ? 'IPO' : 'HAKUNA'
-    });
+    console.log('MPESA RECEIPT IMEPATIKANA:', payment.MpesaReceiptNumber);
     
-    // 4. Unda Supabase client
-    console.log('IMPORTING SUPABASE...');
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
     );
     
-    // 5. Tengeneza data ya ku-insert - ZOTE SASA
     const insertData = {
       amount: payment.Amount,
-      phone: payment.Phone,
+      phone: payment.Phone || payment.MSISDN || payment.PhoneNumber,
       mpesa_receipt: payment.MpesaReceiptNumber,
-      reference: payment.ExternalReference,
-      status: payment.Status, // 'Success'
-      raw_data: payment // Weka response yote ya PayHero hapa
-      // paid_at itajazwa na default now() kwa Supabase
+      reference: payment.ExternalReference || payment.BillRefNumber,
+      status: payment.Status || payment.ResultDesc,
+      raw_data: body // Weka body yote
     };
     
     console.log('DATA YA KU-INSERT:', JSON.stringify(insertData));
     
-    // 6. INSERT KWA SUPABASE
     console.log('INSERTING TO SUPABASE...');
     const { data, error } = await supabase
       .from('payments')
       .insert(insertData)
       .select();
     
-    // 7. Check kama imefaulu
     if (error) {
       console.log('!!! SUPABASE ERROR !!!');
       console.log('CODE:', error.code);
       console.log('MESSAGE:', error.message);
       console.log('DETAILS:', error.details);
-      console.log('HINT:', error.hint);
     } else {
-      console.log('!!! SUCCESS !!!');
-      console.log('ROW ILIYOINGIA:', JSON.stringify(data));
+      console.log('!!! SUCCESS !!! ROW IMEINGIA:');
+      console.log(JSON.stringify(data));
     }
     
   } catch (err) {
     console.log('!!! CRASH ERROR !!!');
-    console.log('ERROR NAME:', err.name);
-    console.log('ERROR MESSAGE:', err.message);
+    console.log('ERROR:', err.message);
   }
   
   console.log('=== CALLBACK END ===');
