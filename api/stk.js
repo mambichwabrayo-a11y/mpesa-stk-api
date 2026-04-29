@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         channel_id: Number(process.env.CHANNEL_ID), // ILIKUWA ChannelID - HII NDIO SAHIHI
         provider: 'm-pesa',
         external_reference: 'TXN-' + Date.now(),
-        callback_url: 'https://yourdomain.com/api/callback' // Optional but recommended
+        callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
       })
     });
 
