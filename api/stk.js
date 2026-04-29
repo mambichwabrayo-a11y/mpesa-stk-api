@@ -4,11 +4,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' });
+  if (req.method!== 'POST') return res.status(405).json({ error: 'Use POST only' });
 
   try {
     const { phone, amount } = req.body;
-    if (!phone || !amount) {
+    if (!phone ||!amount) {
       return res.status(400).json({ error: 'phone and amount required' });
     }
 
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     const pass = process.env.PAYHERO_PASS;
     const channel = process.env.CHANNEL_ID;
 
-    if (!user || !pass || !channel) {
+    if (!user ||!pass ||!channel) {
       return res.status(500).json({ error: 'Missing env vars: PAYHERO_USER, PAYHERO_PASS, CHANNEL_ID' });
     }
 
@@ -29,11 +29,11 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        amount: Number(amount),
-        phone: String(phone),
-        channel_id: Number(channel),
-        provider: 'm-pesa',
-        external_reference: 'TXN-' + Date.now()
+        PhoneNumber: String(phone), // HII NDIO ALIKUA ANAITAKA
+        Amount: Number(amount),
+        ChannelID: Number(channel), // Capital C, I
+        Provider: 'm-pesa',
+        ExternalReference: 'TXN-' + Date.now()
       })
     });
 
