@@ -1,1 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lipa na M-Pesa</title>
+    <style>
+        body { font-family: Arial; max-width: 400px; margin: 50px auto; padding: 20px; }
+        .hidden { display: none; }
+        .success { background: #d1fae5; padding: 15px; border-radius: 8px; }
+        .failed { background: #fee2e2; padding: 15px; border-radius: 8px; }
+        .pending { background: #fef3c7; padding: 15px; border-radius: 8px; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; }
+        button { background: #16a34a; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="pay-section">
+        <h2>Lipa KES 1</h2>
+        <input type="text" id="phone" placeholder="254712345678" value="254">
+        <button onclick="startPayment()">Lipa na M-Pesa</button>
+    </div>
+    <div id="pending-section" class="hidden pending">
+        <h3>⏳ Subiri...</h3>
+        <p>Check simu yako na weka M-Pesa PIN</p>
+        <p id="status-text">Inacheck payment...</p>
+    </div>
+    <div id="success-section" class="hidden success">
+        <h3>✅ Payment Successful!</h3>
+        <p>Receipt: <span id="receipt-number"></span></p>
+    </div>
+    <div id="failed-section" class="hidden failed">
+        <h3>❌ Payment Failed</h3>
+        <p>Jaribu tena tafadhali</p>
+        <button onclick="location.reload()">Retry</button>
+    </div>
+<script>
+var STK_PUSH_URL = '/api/stk-push';
+var CHECK_PAYMENT_URL = '/api/check-payment';
+var pollingInterval = null;
+var attempts = 0;
+var maxAttempts = 60;
 
+function startPayment() {
+    var phone = document.getElementById('phone').value;
+    if (!phone || phone.length < 12) {
+        alert('Weka namba sahihi: 254...');
+        return;
+    }
+    document.getElementById('pay-section').classList.add('hidden');
+    document.getElementById('pending-section').classList.remove('hidden');
+    fetch(STK_PUSH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 1, phone: phone })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (!data.reference) {
+            throw new Error('Hakuna reference');
+        }
+        startPolling(data.reference);
+    })
+    .catch(function(err) {
+        showFailed();
+        console.error(err);
+    });
+}
+
+function startPolling(checkoutRef) {
+    attempts = 0;
+    pollingInterval = setInterval(function() {
+        attempts++;
+        document.getElementById('status-text').innerText = 'Inacheck... ' + attempts + '/60';
+        fetch(CHECK_PAYMENT_URL + '?ref=' + checkoutRef)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.payment_status === 'paid') {
+                showSuccess(data.mpesa_receipt);
+                clearInterval(pollingInterval);
+            }
+            if (data.payment_status === 'failed') {
+                showFailed();
+                clearInterval(pollingInterval);
+            }
+            if (attempts >= maxAttempts) {
+                showFailed();
+                clearInterval(pollingInterval);
+            }
+        })
+        .catch(function(err) {
+            console.error('Polling error:', err);
+        });
+    }, 2000);
+}
+
+function showSuccess(receipt) {
+    document.getElementById('pending-section').classList.add('hidden');
+    document.getElementById('success-section').classList.remove('hidden');
+    document.getElementById('receipt-number').innerText = receipt;
+}
+
+function showFailed() {
+    document.getElementById('pending-section').classList.add('hidden');
+    document.getElementById('failed-section').classList.remove('hidden');
+    if (pollingInterval) clearInterval(pollingInterval);
+}
+</script>
+</body>
+</html>
