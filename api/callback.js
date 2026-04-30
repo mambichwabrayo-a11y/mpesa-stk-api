@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+\import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -6,48 +6,53 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' })
 
   try {
-    console.log('PAYHERO CALLBACK:', req.body)
-    
+    console.log('PAYHERO CALLBACK RECEIVED:', JSON.stringify(req.body))
+
     const { status, response } = req.body
-    
-    // PayHero anatuma status: true na ResultCode: 0 kwa success
+
+    // Check if payment was successful
     if (status === true && response?.ResultCode === 0) {
       
       const { 
-        ExternalReference,    // ← HII NDIO CHECKOUT_ID YAKO
+        ExternalReference, 
         MpesaReceiptNumber, 
-        Amount,
-        Phone
+        Amount, 
+        Phone 
       } = response
 
-      console.log('Updating DB for:', ExternalReference)
+      console.log('UPDATING DB FOR:', ExternalReference)
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('payments')
         .update({
           payment_status: 'paid',
           mpesa_receipt: MpesaReceiptNumber,
           amount: Amount,
-          phone: Phone,
-          updated_at: new Date().toISOString()
+          phone: Phone
         })
-        .eq('checkout_id', ExternalReference) // ← Match na TXN-... yako
+        .eq('checkout_id', ExternalReference)
+        .select()
 
       if (error) {
         console.error('SUPABASE UPDATE ERROR:', error)
-        return res.status(500).json({ error: 'DB update failed' })
+        return res.status(500).json({ error: 'DB update failed', details: error.message })
       }
 
-      console.log('SUCCESS: Payment updated', ExternalReference)
-    } else {
-      console.log('Payment failed or cancelled:', response?.ResultDesc)
+      console.log('SUCCESS: Payment updated', data)
       
-      // Optional: Update status iwe 'failed'
+    } else {
+      // Payment failed or was cancelled
+      console.log('PAYMENT FAILED:', response?.ResultDesc)
+      
       if (response?.ExternalReference) {
         await supabase
           .from('payments')
@@ -56,7 +61,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Jibu PayHero
+    // Always respond 200 to PayHero
     res.status(200).json({ ResultCode: 0, ResultDesc: "Success" })
 
   } catch (error) {
