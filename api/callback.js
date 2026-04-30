@@ -1,21 +1,18 @@
 export default async function handler(req, res) {
+  // Jibu M-Pesa haraka
   res.status(200).json({ ResultCode: 0, ResultDesc: 'Received' });
   
   console.log('=== CALLBACK START ===');
-  console.log('METHOD:', req.method);
-  console.log('BODY KAMILI:', JSON.stringify(req.body, null, 2));
   
   try {
     const body = req.body;
-    
-    // PayHero huweka data kwa 'response' ama direct kwa body
     const payment = body.response || body;
     
     console.log('PAYMENT OBJECT:', JSON.stringify(payment, null, 2));
     
-    // Check kama hii ni callback ya Success
+    // Check kama malipo yamefaulu
     if (!payment?.MpesaReceiptNumber) {
-      console.log('HAKUNA MPESA RECEIPT - HII SIO CALLBACK YA MALIPO');
+      console.log('HAKUNA MPESA RECEIPT - Payment failed/cancelled');
       console.log('ResultCode:', payment?.ResultCode);
       console.log('ResultDesc:', payment?.ResultDesc);
       return;
@@ -26,33 +23,31 @@ export default async function handler(req, res) {
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY
+      process.env.SUPABASE_SERVICE_KEY  // ← SERVICE_KEY, sio ANON_KEY
     );
     
-    const insertData = {
-      amount: payment.Amount,
-      phone: payment.Phone || payment.MSISDN || payment.PhoneNumber,
-      mpesa_receipt: payment.MpesaReceiptNumber,
-      reference: payment.ExternalReference || payment.BillRefNumber,
-      status: payment.Status || payment.ResultDesc,
-      raw_data: body // Weka body yote
-    };
+    const checkoutRef = payment.ExternalReference || payment.BillRefNumber || payment.CheckoutRequestID;
     
-    console.log('DATA YA KU-INSERT:', JSON.stringify(insertData));
+    console.log('UPDATING checkout_id:', checkoutRef);
     
-    console.log('INSERTING TO SUPABASE...');
+    // UPDATE ROW ILIOPO badala ya INSERT mpya
     const { data, error } = await supabase
       .from('payments')
-      .insert(insertData)
+      .update({
+        payment_status: 'paid',  // ← column sahihi
+        mpesa_receipt: payment.MpesaReceiptNumber,
+        raw_data: body
+      })
+      .eq('checkout_id', checkoutRef)  // ← tafuta row na checkout_id hii
       .select();
     
     if (error) {
-      console.log('!!! SUPABASE ERROR !!!');
-      console.log('CODE:', error.code);
+      console.log('!!! SUPABASE UPDATE ERROR !!!');
       console.log('MESSAGE:', error.message);
-      console.log('DETAILS:', error.details);
+    } else if (data.length === 0) {
+      console.log('!!! WARNING !!! Hakuna row ilipatikana na checkout_id:', checkoutRef);
     } else {
-      console.log('!!! SUCCESS !!! ROW IMEINGIA:');
+      console.log('!!! SUCCESS !!! ROW IME-UPDATE:');
       console.log(JSON.stringify(data));
     }
     
