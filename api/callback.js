@@ -1,60 +1,47 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
+
 export default async function handler(req, res) {
-  // Jibu M-Pesa haraka
-  res.status(200).json({ ResultCode: 0, ResultDesc: 'Received' });
-  
-  console.log('=== CALLBACK START ===');
-  
-  try {
-    const body = req.body;
-    const payment = body.response || body;
-    
-    console.log('PAYMENT OBJECT:', JSON.stringify(payment, null, 2));
-    
-    // Check kama malipo yamefaulu
-    if (!payment?.MpesaReceiptNumber) {
-      console.log('HAKUNA MPESA RECEIPT - Payment failed/cancelled');
-      console.log('ResultCode:', payment?.ResultCode);
-      console.log('ResultDesc:', payment?.ResultDesc);
-      return;
-    }
-    
-    console.log('MPESA RECEIPT IMEPATIKANA:', payment.MpesaReceiptNumber);
-    
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY  // ← SERVICE_KEY, sio ANON_KEY
-    );
-    
-    const checkoutRef = payment.ExternalReference || payment.BillRefNumber || payment.CheckoutRequestID;
-    
-    console.log('UPDATING checkout_id:', checkoutRef);
-    
-    // UPDATE ROW ILIOPO badala ya INSERT mpya
-    const { data, error } = await supabase
-      .from('payments')
-      .update({
-        payment_status: 'paid',  // ← column sahihi
-        mpesa_receipt: payment.MpesaReceiptNumber,
-        raw_data: body
-      })
-      .eq('checkout_id', checkoutRef)  // ← tafuta row na checkout_id hii
-      .select();
-    
-    if (error) {
-      console.log('!!! SUPABASE UPDATE ERROR !!!');
-      console.log('MESSAGE:', error.message);
-    } else if (data.length === 0) {
-      console.log('!!! WARNING !!! Hakuna row ilipatikana na checkout_id:', checkoutRef);
-    } else {
-      console.log('!!! SUCCESS !!! ROW IME-UPDATE:');
-      console.log(JSON.stringify(data));
-    }
-    
-  } catch (err) {
-    console.log('!!! CRASH ERROR !!!');
-    console.log('ERROR:', err.message);
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
-  
-  console.log('=== CALLBACK END ===');
+
+  try {
+    // Hii ndio format ya PayHero
+    const { status, CheckoutRequestID, MpesaReceiptNumber, Amount, Phone } = req.body
+
+    console.log('PayHero Callback:', req.body) // Check Vercel logs
+
+    if (status === 'success') {
+      // Update Supabase
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          payment_status: 'paid',
+          mpesa_receipt: MpesaReceiptNumber,
+          amount: Amount,
+          phone: Phone,
+          updated_at: new Date().toISOString()
+        })
+        .eq('checkout_id', CheckoutRequestID) // Hakikisha checkout_id inalingana
+
+      if (error) {
+        console.error('Supabase Error:', error)
+        return res.status(500).json({ error: 'DB update failed' })
+      }
+
+      console.log('Payment updated successfully:', CheckoutRequestID)
+    }
+
+    // PayHero inataka ujibu hivi
+    res.status(200).json({ ResultCode: 0, ResultDesc: "Success" })
+
+  } catch (error) {
+    console.error('Callback Error:', error)
+    res.status(500).json({ error: 'Server error' })
+  }
 }
