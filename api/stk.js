@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY  // ← SERVICE_KEY kwa backend
+      process.env.SUPABASE_SERVICE_KEY
     );
 
     console.log('INSERTING PENDING TO SUPABASE...');
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         amount: Number(amount),
         phone: String(phone),
         checkout_id: checkout_id,
-        payment_status: 'pending'  // ← Muhimu sana
+        payment_status: 'pending'
       });
 
     if (dbError) {
@@ -51,12 +51,13 @@ export default async function handler(req, res) {
         phone_number: String(phone),
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
-        external_reference: checkout_id,  // ← Tumia checkout_id hiyo hiyo
+        external_reference: checkout_id,
         callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
       })
     });
 
     const data = await response.json();
+    console.log('Payhero Response:', data);
     
     if (!response.ok) {
       // Kama STK imeshindwa, update status iwe 'failed'
@@ -68,10 +69,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, payhero_error: data });
     }
 
-    // 4. RUDISHA JIBU KWA FRONTEND
+    // 4. RUDISHA JIBU KWA FRONTEND - HII NDIO FIX KUBWA
     return res.status(200).json({ 
       success: true, 
-      checkout_id: checkout_id,  // ← Rudisha hii kwa frontend ku-track
+      checkout_id: checkout_id,
+      CheckoutRequestID: data.reference || checkout_id, // ← FRONTEND INAANGALIA HII
       data: data 
     });
     
