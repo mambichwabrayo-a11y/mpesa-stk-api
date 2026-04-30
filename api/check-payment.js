@@ -24,8 +24,14 @@ export default async function handler(req, res) {
             return res.status(200).json({ payment_status: 'pending' });
         }
 
+        // FIX KUBWA: Map 'success' kutoka DB kuwa 'paid' kwa frontend
+        let frontend_status = data.payment_status;
+        if (data.payment_status === 'success') {
+            frontend_status = 'paid'; // Frontend yako inatafuta 'paid'
+        }
+
         return res.status(200).json({ 
-            payment_status: data.payment_status, // 'paid' | 'failed' | 'pending'
+            payment_status: frontend_status, // 'paid' | 'failed' | 'pending'
             mpesa_receipt: data.mpesa_receipt || null
         });
 
