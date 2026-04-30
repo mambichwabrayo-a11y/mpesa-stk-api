@@ -10,10 +10,9 @@ export default async function handler(req, res) {
     const { phone, amount } = req.body;
     if (!phone || !amount) return res.status(400).json({ error: 'phone and amount required' });
 
-    // 1. TENGENEZA UNIQUE CHECKOUT ID - bado tunatumia kwa external_reference
     const temp_checkout_id = 'TXN-' + Date.now();
 
-    // 2. TUMA STK PUSH KWA PAYHERO KWANZA - TUPATE REFERENCE YAKE
+    // 1. TUMA STK PUSH KWA PAYHERO
     const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
 
     const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
@@ -27,7 +26,7 @@ export default async function handler(req, res) {
         phone_number: String(phone),
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
-        external_reference: temp_checkout_id, // Payhero anaipuuza but ni sawa
+        external_reference: temp_checkout_id,
         callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
       })
     });
@@ -35,20 +34,16 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('Payhero Response:', data);
     
-    // 3. CHECK KAMA PAYHERO AMEKUBALI STK
-    if (!response.ok || data.status !== 'success') {
+    // 2. FIX: PAYHERO V2 HURUDISHA STATUS 'QUEUED' SIO 'SUCCESS'
+    // Kama kuna reference, maana STK imetumwa. Hata kama status ni QUEUED
+    if (!data.reference) {
+      console.log('!!! PAYHERO HAKURUDISHA REFERENCE !!!', data);
       return res.status(400).json({ success: false, payhero_error: data });
     }
 
-    // 4. TUMIA REFERENCE YA PAYHERO KAMA CHECKOUT_ID YETU - HII NDIO FIX
-    const checkout_id = data.reference; // ← Payhero anarudisha hii kwa callback
+    const checkout_id = data.reference;
 
-    if (!checkout_id) {
-      console.log('!!! PAYHERO HAKURUDISHA REFERENCE !!!');
-      return res.status(500).json({ success: false, error: 'No reference from Payhero' });
-    }
-
-    // 5. INSERT KWA SUPABASE BAADA YA KUPATA REFERENCE YA PAYHERO
+    // 3. INSERT KWA SUPABASE
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
@@ -61,7 +56,7 @@ export default async function handler(req, res) {
       .insert({
         amount: Number(amount),
         phone: String(phone),
-        checkout_id: checkout_id, // ← SASA TUNATUMIA YA PAYHERO
+        checkout_id: checkout_id,
         payment_status: 'pending'
       });
 
@@ -72,10 +67,11 @@ export default async function handler(req, res) {
     
     console.log('PENDING ROW IMEINGIA:', checkout_id);
 
-    // 6. RUDISHA JIBU KWA FRONTEND - TUMIA REFERENCE YA PAYHERO
+    // 4. RUDISHA SUCCESS - STK IMETUMWA
     return res.status(200).json({ 
       success: true, 
-      checkout_id: checkout_id, // ← HII NDIO FRONTEND ITATUMIA KU-CHECK
+      message: 'STK sent successfully',
+      checkout_id: checkout_id,
       CheckoutRequestID: checkout_id,
       data: data 
     });
