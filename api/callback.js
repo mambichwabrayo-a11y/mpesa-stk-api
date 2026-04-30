@@ -6,7 +6,6 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -22,11 +21,10 @@ export default async function handler(req, res) {
   try {
     console.log('PAYHERO CALLBACK:', JSON.stringify(req.body))
 
-    // FEATURE: Support Payhero v2 structures tofauti
     const { status, response, reference, external_reference } = req.body
     
-    // Tafuta checkout_id kutoka mahali popote Payhero atatuma
-    const ExternalReference = response?.ExternalReference || external_reference || reference || req.body.reference
+    // PAYHERO ANARUDISHA ExternalReference = TXN-... YETU
+    const ExternalReference = response?.ExternalReference || external_reference || reference
 
     if (!ExternalReference) {
       console.log('Missing ExternalReference')
@@ -35,7 +33,6 @@ export default async function handler(req, res) {
 
     const { MpesaReceiptNumber, ResultCode, ResultDesc, Amount, Phone } = response || req.body
 
-    // FEATURE: Check success kwa njia zote Payhero v2 anatumia
     const isSuccess = (status === true || status === 'success') && (ResultCode === 0 || ResultCode === '0')
 
     if (isSuccess) {
@@ -44,12 +41,12 @@ export default async function handler(req, res) {
       const { data, error } = await supabase
         .from('payments')
         .update({
-          payment_status: 'success', // ← FIX KUBWA: Badilisha 'paid' kuwa 'success'
+          payment_status: 'success',
           mpesa_receipt: MpesaReceiptNumber,
           amount: Amount,
           phone: Phone
         })
-        .eq('checkout_id', ExternalReference)
+        .eq('checkout_id', ExternalReference) // ← SASA ITAPATA ROW
         .select()
 
       if (error) {
