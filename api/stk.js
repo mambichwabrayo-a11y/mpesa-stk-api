@@ -10,9 +10,34 @@ export default async function handler(req, res) {
     const { phone, amount } = req.body;
     if (!phone || !amount) return res.status(400).json({ error: 'phone and amount required' });
 
-    const temp_checkout_id = 'TXN-' + Date.now();
+    // 1. TUMIA HII KAMA CHECKOUT_ID - PAYHERO ATARUDISHA HII KWA CALLBACK
+    const checkout_id = 'TXN-' + Date.now();
 
-    // 1. TUMA STK PUSH KWA PAYHERO
+    // 2. INSERT KWA SUPABASE KWANZA
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
+    console.log('INSERTING PENDING TO SUPABASE:', checkout_id);
+    const { error: dbError } = await supabase
+      .from('payments')
+      .insert({
+        amount: Number(amount),
+        phone: String(phone),
+        checkout_id: checkout_id, // ← TXN-... HII NDIO CALLBACK ITATUMIA
+        payment_status: 'pending'
+      });
+
+    if (dbError) {
+      console.log('!!! SUPABASE INSERT ERROR !!!', dbError.message);
+      return res.status(500).json({ success: false, db_error: dbError.message });
+    }
+    
+    console.log('PENDING ROW IMEINGIA:', checkout_id);
+
+    // 3. TUMA STK PUSH KWA PAYHERO
     const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
 
     const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
@@ -26,7 +51,7 @@ export default async function handler(req, res) {
         phone_number: String(phone),
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
-        external_reference: temp_checkout_id,
+        external_reference: checkout_id, // ← TUMA HII KWA PAYHERO
         callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
       })
     });
@@ -34,44 +59,20 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('Payhero Response:', data);
     
-    // 2. FIX: PAYHERO V2 HURUDISHA STATUS 'QUEUED' SIO 'SUCCESS'
-    // Kama kuna reference, maana STK imetumwa. Hata kama status ni QUEUED
+    // 4. CHECK KAMA PAYHERO AMEKUBALI - USIANGALIE STATUS
     if (!data.reference) {
-      console.log('!!! PAYHERO HAKURUDISHA REFERENCE !!!', data);
+      await supabase
+        .from('payments')
+        .update({ payment_status: 'failed' })
+        .eq('checkout_id', checkout_id);
+      
       return res.status(400).json({ success: false, payhero_error: data });
     }
 
-    const checkout_id = data.reference;
-
-    // 3. INSERT KWA SUPABASE
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
-
-    console.log('INSERTING PENDING TO SUPABASE:', checkout_id);
-    const { error: dbError } = await supabase
-      .from('payments')
-      .insert({
-        amount: Number(amount),
-        phone: String(phone),
-        checkout_id: checkout_id,
-        payment_status: 'pending'
-      });
-
-    if (dbError) {
-      console.log('!!! SUPABASE INSERT ERROR !!!', dbError.message);
-      return res.status(500).json({ success: false, db_error: dbError.message });
-    }
-    
-    console.log('PENDING ROW IMEINGIA:', checkout_id);
-
-    // 4. RUDISHA SUCCESS - STK IMETUMWA
+    // 5. RUDISHA TXN-... KWA FRONTEND
     return res.status(200).json({ 
       success: true, 
-      message: 'STK sent successfully',
-      checkout_id: checkout_id,
+      checkout_id: checkout_id, // ← HII NDIO FRONTEND ITATUMIA
       CheckoutRequestID: checkout_id,
       data: data 
     });
