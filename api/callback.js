@@ -6,42 +6,45 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  // 1. LOG KILA KITU PAYHERO ANATUMA
+  console.log('=== PAYHERO CALLBACK RAW ===');
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log('=== END CALLBACK ===');
 
+  // 2. Jibu PayHero haraka ndio asikate
+  res.status(200).json({ ResultCode: 0, ResultDesc: "Received" });
+
+  // 3. Jaribu ku-update - tuta-check field names zote possible
   try {
-    // Hii ndio format ya PayHero
-    const { status, CheckoutRequestID, MpesaReceiptNumber, Amount, Phone } = req.body
+    const body = req.body;
+    
+    // PayHero anaweza tuma hizi field tofauti
+    const checkoutID = body.CheckoutRequestID || body.external_reference || body.reference || body.request_id;
+    const receipt = body.MpesaReceiptNumber || body.receipt || body.transaction_id;
+    const status = body.status || body.Status;
+    
+    console.log('Parsed:', { checkoutID, receipt, status });
 
-    console.log('PayHero Callback:', req.body) // Check Vercel logs
-
-    if (status === 'success') {
-      // Update Supabase
+    if (status === 'success' || status === 'Success' || status === 'SUCCESS') {
       const { error } = await supabase
         .from('payments')
         .update({
           payment_status: 'paid',
-          mpesa_receipt: MpesaReceiptNumber,
-          amount: Amount,
-          phone: Phone,
+          mpesa_receipt: receipt,
           updated_at: new Date().toISOString()
         })
-        .eq('checkout_id', CheckoutRequestID) // Hakikisha checkout_id inalingana
+        .eq('checkout_id', checkoutID);
 
       if (error) {
-        console.error('Supabase Error:', error)
-        return res.status(500).json({ error: 'DB update failed' })
+        console.log('SUPABASE UPDATE ERROR:', error);
+      } else {
+        console.log('SUCCESS: Updated', checkoutID);
       }
-
-      console.log('Payment updated successfully:', CheckoutRequestID)
+    } else {
+      console.log('Payment not success:', status);
     }
 
-    // PayHero inataka ujibu hivi
-    res.status(200).json({ ResultCode: 0, ResultDesc: "Success" })
-
-  } catch (error) {
-    console.error('Callback Error:', error)
-    res.status(500).json({ error: 'Server error' })
+  } catch (e) {
+    console.log('CALLBACK CRASH:', e.message);
   }
 }
