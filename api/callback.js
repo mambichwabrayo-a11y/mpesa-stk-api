@@ -6,45 +6,61 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  // 1. LOG KILA KITU PAYHERO ANATUMA
-  console.log('=== PAYHERO CALLBACK RAW ===');
-  console.log(JSON.stringify(req.body, null, 2));
-  console.log('=== END CALLBACK ===');
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
 
-  // 2. Jibu PayHero haraka ndio asikate
-  res.status(200).json({ ResultCode: 0, ResultDesc: "Received" });
-
-  // 3. Jaribu ku-update - tuta-check field names zote possible
   try {
-    const body = req.body;
+    console.log('PAYHERO CALLBACK:', req.body)
     
-    // PayHero anaweza tuma hizi field tofauti
-    const checkoutID = body.CheckoutRequestID || body.external_reference || body.reference || body.request_id;
-    const receipt = body.MpesaReceiptNumber || body.receipt || body.transaction_id;
-    const status = body.status || body.Status;
+    const { status, response } = req.body
     
-    console.log('Parsed:', { checkoutID, receipt, status });
+    // PayHero anatuma status: true na ResultCode: 0 kwa success
+    if (status === true && response?.ResultCode === 0) {
+      
+      const { 
+        ExternalReference,    // ← HII NDIO CHECKOUT_ID YAKO
+        MpesaReceiptNumber, 
+        Amount,
+        Phone
+      } = response
 
-    if (status === 'success' || status === 'Success' || status === 'SUCCESS') {
+      console.log('Updating DB for:', ExternalReference)
+
       const { error } = await supabase
         .from('payments')
         .update({
           payment_status: 'paid',
-          mpesa_receipt: receipt,
+          mpesa_receipt: MpesaReceiptNumber,
+          amount: Amount,
+          phone: Phone,
           updated_at: new Date().toISOString()
         })
-        .eq('checkout_id', checkoutID);
+        .eq('checkout_id', ExternalReference) // ← Match na TXN-... yako
 
       if (error) {
-        console.log('SUPABASE UPDATE ERROR:', error);
-      } else {
-        console.log('SUCCESS: Updated', checkoutID);
+        console.error('SUPABASE UPDATE ERROR:', error)
+        return res.status(500).json({ error: 'DB update failed' })
       }
+
+      console.log('SUCCESS: Payment updated', ExternalReference)
     } else {
-      console.log('Payment not success:', status);
+      console.log('Payment failed or cancelled:', response?.ResultDesc)
+      
+      // Optional: Update status iwe 'failed'
+      if (response?.ExternalReference) {
+        await supabase
+          .from('payments')
+          .update({ payment_status: 'failed' })
+          .eq('checkout_id', response.ExternalReference)
+      }
     }
 
-  } catch (e) {
-    console.log('CALLBACK CRASH:', e.message);
+    // Jibu PayHero
+    res.status(200).json({ ResultCode: 0, ResultDesc: "Success" })
+
+  } catch (error) {
+    console.error('CALLBACK CRASH:', error.message)
+    res.status(500).json({ error: 'Server error' })
   }
 }
