@@ -22,22 +22,29 @@ export default async function handler(req, res) {
   try {
     console.log('PAYHERO CALLBACK:', JSON.stringify(req.body))
 
-    const { status, response } = req.body
+    // FEATURE: Support Payhero v2 structures tofauti
+    const { status, response, reference, external_reference } = req.body
+    
+    // Tafuta checkout_id kutoka mahali popote Payhero atatuma
+    const ExternalReference = response?.ExternalReference || external_reference || reference || req.body.reference
 
-    if (!response?.ExternalReference) {
+    if (!ExternalReference) {
       console.log('Missing ExternalReference')
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'No reference' })
     }
 
-    const { ExternalReference, MpesaReceiptNumber, ResultCode, ResultDesc, Amount, Phone } = response
+    const { MpesaReceiptNumber, ResultCode, ResultDesc, Amount, Phone } = response || req.body
 
-    if (status === true && ResultCode === 0) {
+    // FEATURE: Check success kwa njia zote Payhero v2 anatumia
+    const isSuccess = (status === true || status === 'success') && (ResultCode === 0 || ResultCode === '0')
+
+    if (isSuccess) {
       console.log('PAYMENT SUCCESS FOR:', ExternalReference)
 
       const { data, error } = await supabase
         .from('payments')
         .update({
-          payment_status: 'paid',
+          payment_status: 'success', // ← FIX KUBWA: Badilisha 'paid' kuwa 'success'
           mpesa_receipt: MpesaReceiptNumber,
           amount: Amount,
           phone: Phone
