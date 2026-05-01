@@ -1,8 +1,4 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron-recover",
-      "schedule": "* * * * *"
-    }
-  ]
-}
+"crons": [{
+     "path": "/api/cron-recover", 
+     "schedule": "0 0 * * *"
+   }]
