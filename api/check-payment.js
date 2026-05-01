@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     try {
         const { data, error } = await supabase
             .from('payments')
-            .select('payment_status, mpesa_receipt')
+            .select('payment_status, mpesa_receipt, amount, failure_reason, phone')
             .eq('checkout_id', ref)
             .single();
 
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
             return res.status(200).json({ payment_status: 'pending' });
         }
 
-        // FIX KUBWA: Map 'success' kutoka DB kuwa 'paid' kwa frontend
+        // FIX KUBWA: Map 'success' kutoka DB kuwa 'paid' kwa frontend - HII HAIJABADILIKA
         let frontend_status = data.payment_status;
         if (data.payment_status === 'success') {
             frontend_status = 'paid'; // Frontend yako inatafuta 'paid'
@@ -32,7 +32,10 @@ export default async function handler(req, res) {
 
         return res.status(200).json({ 
             payment_status: frontend_status, // 'paid' | 'failed' | 'pending'
-            mpesa_receipt: data.mpesa_receipt || null
+            mpesa_receipt: data.mpesa_receipt || null,
+            amount: data.amount || null, // ← ADDED: Kwa modal ya success
+            failure_reason: data.failure_reason || null, // ← ADDED: Kwa modal ya failed
+            phone: data.phone || null // ← ADDED: Optional, kama unaitaka
         });
 
     } catch (error) {
