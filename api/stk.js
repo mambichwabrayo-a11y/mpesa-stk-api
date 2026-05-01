@@ -8,12 +8,10 @@ export default async function handler(req, res) {
 
   try {
     const { phone, amount } = req.body;
-    if (!phone || !amount) return res.status(400).json({ error: 'phone and amount required' });
+    if (!phone || !amount) return res.status(400).json({ error: 'Phone and amount are required' });
 
-    // 1. TUMIA HII KAMA CHECKOUT_ID - PAYHERO ATARUDISHA HII KWA CALLBACK
     const checkout_id = 'TXN-' + Date.now();
 
-    // 2. INSERT KWA SUPABASE KWANZA
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
@@ -26,7 +24,7 @@ export default async function handler(req, res) {
       .insert({
         amount: Number(amount),
         phone: String(phone),
-        checkout_id: checkout_id, // ← TXN-... HII NDIO CALLBACK ITATUMIA
+        checkout_id: checkout_id,
         payment_status: 'pending'
       });
 
@@ -35,9 +33,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ success: false, db_error: dbError.message });
     }
     
-    console.log('PENDING ROW IMEINGIA:', checkout_id);
+    console.log('PENDING ROW INSERTED:', checkout_id);
 
-    // 3. TUMA STK PUSH KWA PAYHERO
     const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
 
     const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
@@ -51,34 +48,112 @@ export default async function handler(req, res) {
         phone_number: String(phone),
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
-        external_reference: checkout_id, // ← TUMA HII KWA PAYHERO
+        external_reference: checkout_id,
         callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
       })
     });
 
     const data = await response.json();
-    console.log('Payhero Response:', data);
+    console.log('PayHero Response:', data);
     
-    // 4. CHECK KAMA PAYHERO AMEKUBALI - USIANGALIE STATUS
+    // Handle 401 Unauthorized - Credentials expired or insufficient tokens
+    if (response.status === 401) {
+      await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: 'Service temporarily unavailable. Please contact support.'
+        })
+        .eq('checkout_id', checkout_id);
+      
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Payment service is temporarily unavailable. Please try again later.',
+        code: 'AUTH_FAILED',
+        payhero_error: data 
+      });
+    }
+
+    // Handle insufficient tokens/balance
+    if (data.status === 'FAILED' || data.success === false) {
+      const errorMsg = data.message || data.error || 'Payment request failed';
+      
+      await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: errorMsg
+        })
+        .eq('checkout_id', checkout_id);
+
+      if (errorMsg.toLowerCase().includes('insufficient') || 
+          errorMsg.toLowerCase().includes('balance') || 
+          errorMsg.toLowerCase().includes('token') ||
+          errorMsg.toLowerCase().includes('credit')) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Payment service is temporarily unavailable. Please contact support.',
+          code: 'INSUFFICIENT_TOKENS',
+          payhero_error: data 
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false, 
+        error: errorMsg,
+        code: 'PAYHERO_ERROR',
+        payhero_error: data 
+      });
+    }
+
     if (!data.reference) {
       await supabase
         .from('payments')
-        .update({ payment_status: 'failed' })
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: 'Payment gateway did not return a reference'
+        })
         .eq('checkout_id', checkout_id);
       
-      return res.status(400).json({ success: false, payhero_error: data });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Payment gateway error. Please try again.',
+        code: 'NO_REFERENCE',
+        payhero_error: data 
+      });
     }
 
-    // 5. RUDISHA TXN-... KWA FRONTEND
     return res.status(200).json({ 
       success: true, 
-      checkout_id: checkout_id, // ← HII NDIO FRONTEND ITATUMIA
+      checkout_id: checkout_id,
       CheckoutRequestID: checkout_id,
       data: data 
     });
     
   } catch (error) {
     console.log('!!! STK CRASH ERROR !!!', error.message);
-    return res.status(500).json({ success: false, server_error: error.message });
-  }
-}
+    
+    try {
+      if (typeof checkout_id !== 'undefined') {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_KEY
+        );
+        await supabase
+          .from('payments')
+          .update({ 
+            payment_status: 'failed',
+            failure_reason: error.message 
+          })
+          .eq('checkout_id', checkout_id);
+      }
+    } catch (e) {
+      console.log('Failed to update DB on crash:', e.message);
+    }
+
+    return res.status(500).json({ 
+      success: false, 
+      server_error: error.message,
+      code: 'SERVER_ERROR'
+    }
