@@ -6,85 +6,58 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
-  // HII NDO MABADILIKO KUBWA - TUNAWAJIBU PAYHERO KWANZA
+  // Jibu PayHero haraka - lazima iwe line ya kwanza
   res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' })
 
   try {
-    console.log('PAYHERO CALLBACK:', JSON.stringify(req.body))
+    const body = req.body
+    console.log('PAYHERO FULL CALLBACK:', JSON.stringify(body))
 
-    const { status, response, reference, external_reference } = req.body
-    
-    // PAYHERO ANARUDISHA ExternalReference = TXN-... YETU
-    const ExternalReference = response?.ExternalReference || external_reference || reference
+    // PayHero hutuma ExternalReference ndani ya response
+    const checkout_id = body?.response?.ExternalReference
+    const receipt = body?.response?.MpesaReceiptNumber
+    const resultCode = body?.response?.ResultCode
 
-    if (!ExternalReference) {
-      console.log('Missing ExternalReference')
+    console.log('CHECKOUT_ID FOUND:', checkout_id)
+
+    if (!checkout_id) {
+      console.log('ERROR: Hakuna ExternalReference kwa callback')
       return
     }
 
-    const { MpesaReceiptNumber, ResultCode, ResultDesc, Amount, Phone } = response || req.body
-    const isSuccess = (status === true || status === 'success') && (ResultCode == 0 || ResultCode === '0')
-
-    // KAMA ISHAKUWA SUCCESS, WACHA
-    const { data: existing } = await supabase
-      .from('payments')
-      .select('payment_status')
-      .eq('checkout_id', ExternalReference)
-      .single()
-
-    if (existing?.payment_status === 'success') {
-      console.log('ALREADY PROCESSED, SKIPPING:', ExternalReference)
-      return
-    }
-
-    if (isSuccess) {
-      console.log('PAYMENT SUCCESS FOR:', ExternalReference)
-
+    if (resultCode == 0) {
+      console.log('UPDATING TO SUCCESS...')
+      
       const { data, error } = await supabase
         .from('payments')
         .update({
           payment_status: 'success',
-          mpesa_receipt: MpesaReceiptNumber,
-          amount: Amount,
-          phone: Phone,
+          mpesa_receipt: receipt,
+          amount: body?.response?.Amount,
+          phone: body?.response?.Phone,
           updated_at: new Date().toISOString()
         })
-        .eq('checkout_id', ExternalReference)
+        .eq('checkout_id', checkout_id)
         .select()
 
       if (error) {
         console.error('SUPABASE UPDATE ERROR:', error)
-        return
+      } else {
+        console.log('DB UPDATED SUCCESSFULLY:', data)
       }
 
-      console.log('DB UPDATED SUCCESSFULLY:', data)
-
     } else {
-      console.log('PAYMENT FAILED:', ResultDesc)
-      
+      console.log('PAYMENT FAILED - ResultCode:', resultCode)
       await supabase
         .from('payments')
         .update({ 
           payment_status: 'failed',
-          failure_reason: ResultDesc,
-          updated_at: new Date().toISOString()
+          failure_reason: body?.response?.ResultDesc
         })
-        .eq('checkout_id', ExternalReference)
+        .eq('checkout_id', checkout_id)
     }
 
   } catch (err) {
-    console.error('CALLBACK CRASH:', err.message)
+    console.error('CALLBACK ERROR:', err.message)
   }
 }
