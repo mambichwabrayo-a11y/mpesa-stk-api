@@ -6,48 +6,72 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  // ZUIA CACHE - HIZI NDIO FIX KUU
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  res.setHeader('Pragma', 'no-cache')
-  res.setHeader('Expires', '0')
-  res.setHeader('Surrogate-Control', 'no-store')
-  
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    const { checkout_id } = req.query
+    console.log('PAYHERO CALLBACK:', JSON.stringify(req.body))
 
-    if (!checkout_id) {
-      return res.status(400).json({ error: 'checkout_id is required' })
+    const { status, response, reference, external_reference } = req.body
+    
+    const ExternalReference = response?.ExternalReference || external_reference || reference
+
+    if (!ExternalReference) {
+      console.log('Missing ExternalReference')
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'No reference' })
     }
 
-    const { data, error } = await supabase
-      .from('payments')
-      .select('payment_status, mpesa_receipt, failure_reason, amount, phone')
-      .eq('checkout_id', checkout_id)
-      .single()
+    const { MpesaReceiptNumber, ResultCode, ResultDesc, Amount, Phone } = response || req.body
 
-    if (error) {
-      console.error('DB ERROR:', error)
-      return res.status(404).json({ error: 'Transaction not found' })
+    const isSuccess = (status === true || status === 'success') && (ResultCode === 0 || ResultCode === '0')
+    const isFailed = (status === false || status === 'failed') || (ResultCode && ResultCode !== 0 && ResultCode !== '0')
+
+    if (isSuccess) {
+      console.log('PAYMENT SUCCESS FOR:', ExternalReference)
+
+      const { data, error } = await supabase
+        .from('payments')
+        .update({
+          payment_status: 'success',
+          mpesa_receipt: MpesaReceiptNumber,
+          amount: Amount,
+          phone: Phone
+        })
+        .eq('checkout_id', ExternalReference)
+        .select()
+
+      if (error) {
+        console.error('SUPABASE UPDATE ERROR:', error)
+        return res.status(500).json({ error: 'Database update failed' })
+      }
+
+      console.log('DB UPDATED SUCCESSFULLY:', data)
+
+    } else if (isFailed) {
+      console.log('PAYMENT FAILED:', ResultDesc)
+      
+      await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: ResultDesc || 'Transaction failed or cancelled'
+        })
+        .eq('checkout_id', ExternalReference)
     }
 
-    // Rudisha data fresh kila time
-    return res.status(200).json(data)
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' })
 
   } catch (err) {
-    console.error('CHECK PAYMENT ERROR:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+    console.error('CALLBACK CRASH:', err.message)
+    res.status(500).json({ error: 'Server error' })
   }
 }
