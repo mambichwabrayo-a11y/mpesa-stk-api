@@ -6,6 +6,17 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' });
 
+  // CHECK ENV VARS KWANZA - HII INAZUIA CRASH
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || 
+      !process.env.PAYHERO_USER || !process.env.PAYHERO_PASS || !process.env.CHANNEL_ID) {
+    console.error('Missing environment variables');
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Server configuration error. Please contact support.',
+      code: 'ENV_MISSING'
+    });
+  }
+
   try {
     const { phone, amount } = req.body;
     if (!phone || !amount) return res.status(400).json({ error: 'Phone and amount are required' });
@@ -56,7 +67,6 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('PayHero Response:', data);
     
-    // Handle 401 Unauthorized - Credentials expired or insufficient tokens
     if (response.status === 401) {
       await supabase
         .from('payments')
@@ -69,12 +79,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ 
         success: false, 
         error: 'Payment service is temporarily unavailable. Please try again later.',
-        code: 'AUTH_FAILED',
-        payhero_error: data 
+        code: 'AUTH_FAILED'
       });
     }
 
-    // Handle insufficient tokens/balance
     if (data.status === 'FAILED' || data.success === false) {
       const errorMsg = data.message || data.error || 'Payment request failed';
       
@@ -93,16 +101,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ 
           success: false, 
           error: 'Payment service is temporarily unavailable. Please contact support.',
-          code: 'INSUFFICIENT_TOKENS',
-          payhero_error: data 
+          code: 'INSUFFICIENT_TOKENS'
         });
       }
       
       return res.status(400).json({ 
         success: false, 
         error: errorMsg,
-        code: 'PAYHERO_ERROR',
-        payhero_error: data 
+        code: 'PAYHERO_ERROR'
       });
     }
 
@@ -118,8 +124,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ 
         success: false, 
         error: 'Payment gateway error. Please try again.',
-        code: 'NO_REFERENCE',
-        payhero_error: data 
+        code: 'NO_REFERENCE'
       });
     }
 
@@ -133,27 +138,10 @@ export default async function handler(req, res) {
   } catch (error) {
     console.log('!!! STK CRASH ERROR !!!', error.message);
     
-    try {
-      if (typeof checkout_id !== 'undefined') {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.SUPABASE_URL,
-          process.env.SUPABASE_SERVICE_KEY
-        );
-        await supabase
-          .from('payments')
-          .update({ 
-            payment_status: 'failed',
-            failure_reason: error.message 
-          })
-          .eq('checkout_id', checkout_id);
-      }
-    } catch (e) {
-      console.log('Failed to update DB on crash:', e.message);
-    }
-
     return res.status(500).json({ 
       success: false, 
-      server_error: error.message,
+      error: 'Server error occurred. Please try again.',
       code: 'SERVER_ERROR'
-    }
+    });
+  }
+}
