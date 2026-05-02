@@ -7,7 +7,6 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-    // ADDED: ZUIA CACHE KABISA - HII NDIO FIX KUU
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
     res.setHeader('Pragma', 'no-cache')
     res.setHeader('Expires', '0')
@@ -22,26 +21,33 @@ export default async function handler(req, res) {
     try {
         const { data, error } = await supabase
             .from('payments')
-            .select('payment_status, mpesa_receipt, amount, failure_reason, phone')
-            .eq('checkout_id', ref)
+            .select('payment_status, mpesa_receipt, amount, failure_reason, phone, CheckoutRequestID')
+            .eq('CheckoutRequestID', ref) // ← FIX KUBWA HAPA
             .single();
 
         if (error || !data) {
+            console.log('DB Error:', error);
             return res.status(200).json({ payment_status: 'pending' });
         }
 
-        // FIX KUBWA: Map 'success' kutoka DB kuwa 'paid' kwa frontend - HII HAIJABADILIKA
+        console.log('DB Data:', data); // DEBUG
+
         let frontend_status = data.payment_status;
-        if (data.payment_status === 'success') {
-            frontend_status = 'paid'; // Frontend yako inatafuta 'paid'
+        
+        if (data.payment_status === 'success' || data.payment_status === 'Success') {
+            frontend_status = 'paid';
+        } else if (data.payment_status === 'Cancelled' || data.payment_status === 'cancelled') {
+            frontend_status = 'cancelled';
+        } else if (data.payment_status === 'Failed' || data.payment_status === 'failed') {
+            frontend_status = 'failed';
         }
 
         return res.status(200).json({ 
-            payment_status: frontend_status, // 'paid' | 'failed' | 'pending'
+            payment_status: frontend_status,
             mpesa_receipt: data.mpesa_receipt || null,
-            amount: data.amount || null, // ← ADDED: Kwa modal ya success
-            failure_reason: data.failure_reason || null, // ← ADDED: Kwa modal ya failed
-            phone: data.phone || null // ← ADDED: Optional, kama unaitaka
+            amount: data.amount || null,
+            failure_reason: data.failure_reason || null,
+            phone: data.phone || null
         });
 
     } catch (error) {
