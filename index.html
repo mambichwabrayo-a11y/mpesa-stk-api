@@ -54,7 +54,7 @@
             z-index:1;
             margin:20px 0;
         }
-        .header{
+       .header{
             background:linear-gradient(135deg,#00a651 0%,#00703c 100%);
             padding:40px 30px;
             text-align:center;
@@ -177,7 +177,7 @@
             z-index:1;
         }
 .spinner{
-            border:3px solid #f3f3f3;
+            border:3px solid #f3f3;
             border-top:3px solid #00a651;
             border-radius:50%;
             width:20px;
@@ -222,7 +222,7 @@
         <div class="footer">Powered by <span class="brand">Mpesa</span> | Secured by <span class="brand">Payhero</span></div>
     </div>
 
-    <div class="credit">Designed by Consultant Digital Solutions</div> 
+    <div class="credit">Designed by Consultant Digital Solutions</div>
     <!-- FAILED MODAL -->
     <div id="failedModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
       <div style="background:white; padding:30px; border-radius:12px; max-width:400px; width:90%; text-align:center; font-family:system-ui;">
@@ -262,8 +262,9 @@
       </div>
     </div>
 <script>
+        // 1. URL YA API - UPDATED
+        var CHECK_PAYMENT_URL='https://mpesa-stk-api.vercel.app/api/check-payment';
         var STK_PUSH_URL='/api/stk';
-        var CHECK_PAYMENT_URL='/api/check-payment';
         var checkInterval;
 
         document.getElementById('amount').addEventListener('focus', function() {
@@ -285,10 +286,25 @@
             else{statusDiv.innerHTML=message}
         }
 
-        function showFailedModal(message) {
-            document.getElementById('failedText').innerText = message;
-            document.getElementById('failedModal').style.display = 'flex';
-            document.getElementById('status').style.display = 'none';
+        // 2. FAILED MODAL FUNCTION - UPDATED
+        function showFailedModal(reason){
+            var failedModal = document.createElement('div');
+            failedModal.innerHTML = `
+            <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;">
+              <div style="background:white;padding:30px;border-radius:12px;text-align:center;max-width:350px;width:90%;">
+                <div style="width:60px;height:60px;background:#dc3545;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                  <svg width="30" height="30" fill="white" viewBox="0 0 24 24">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </div>
+                <h2 style="color:#dc3545;margin:0 0 10px 0;">Payment Failed</h2>
+                <p style="color:#666;margin:0 0 20px 0;">${reason}</p>
+                <button onclick="this.closest('div').parentElement.remove()" style="background:#dc3545;color:white;border:none;padding:12px 30px;border-radius:8px;font-weight:bold;cursor:pointer;width:100%;">
+                  Try Again
+                </button>
+              </div>
+            </div>`;
+            document.body.appendChild(failedModal);
         }
 
         function showSuccessModal(receipt, amount) {
@@ -333,60 +349,59 @@
                 payBtn.innerHTML='Pay with M-Pesa'
             })
         }
-    function checkPaymentStatus(ref, amount){
-    var payBtn=document.getElementById('payBtn');
-    var attempts=0;
 
-    checkInterval=setInterval(function(){
-        attempts++;
-        console.log('Checking payment:', ref, 'Attempt:', attempts); // DEBUG
-        
-        fetch(CHECK_PAYMENT_URL+'?ref='+ref+'&t='+Date.now()) // ← ADDED: &t= kuzuia cache
-  .then(res=>res.json())
-  .then(data=>{
-            console.log('Payment data:', data); // DEBUG - ANGALIA HII BROWSER
-            
-            // SUCCESS - ONA HAPA: Inacheck 'paid' NA 'Success' NA 'success'
-            if(data.payment_status==='paid' || data.payment_status==='Success' || data.payment_status==='success'){
-                clearInterval(checkInterval);
-                showSuccessModal(data.mpesa_receipt, data.amount || amount);
-                payBtn.disabled=false;
-                payBtn.innerHTML='Pay with M-Pesa';
-                document.getElementById('amount').value='';
-                document.getElementById('phone').value=''
-            }
-            // CANCELLED
-            else if(data.payment_status==='cancelled' || data.payment_status==='Cancelled'){
-                clearInterval(checkInterval);
-                showFailedModal('Request Cancelled by user.');
-                payBtn.disabled=false;
-                payBtn.innerHTML='Pay with M-Pesa'
-            }
-            // FAILED
-            else if(data.payment_status==='failed' || data.payment_status==='Failed'){
-                clearInterval(checkInterval);
-                showFailedModal(data.failure_reason || 'Payment failed. Please try again');
-                payBtn.disabled=false;
-                payBtn.innerHTML='Pay with M-Pesa'
-            }
-            else if(attempts>30){
-                clearInterval(checkInterval);
-                showFailedModal('Request timeout. Check your M-Pesa messages');
-                payBtn.disabled=false;
-                payBtn.innerHTML='Pay with M-Pesa'
-            }
-        })
-  .catch(function(err){
-            console.log('Check payment error:', err); // DEBUG
-            if(attempts>30){
-                clearInterval(checkInterval);
-                showFailedModal('Network error. Please try again');
-                payBtn.disabled=false;
-                payBtn.innerHTML='Pay with M-Pesa'
-            }
-        })
-    },3000)
-}
+    // 3. CHECK PAYMENT STATUS - UPDATED
+    function checkPaymentStatus(ref, amount){
+        var payBtn=document.getElementById('payBtn');
+        var attempts=0;
+
+        checkInterval=setInterval(function(){
+            attempts++;
+
+            fetch(CHECK_PAYMENT_URL+'?ref='+ref)
+     .then(res=>res.json())
+     .then(data=>{
+
+                // SUCCESS - HII IKO PERFECT
+                if(data.payment_status==='paid' || data.payment_status==='Success' || data.payment_status==='success'){
+                    clearInterval(checkInterval);
+                    showSuccessModal(data.mpesa_receipt, data.amount || amount);
+                    payBtn.disabled=false;
+                    payBtn.innerHTML='Pay with M-Pesa';
+                    document.getElementById('amount').value='';
+                    document.getElementById('phone').value='';
+                }
+                // CANCELLED
+                else if(data.payment_status==='Cancelled'){
+                    clearInterval(checkInterval);
+                    showFailedModal('Request Cancelled by User. Please try again.');
+                    payBtn.disabled=false;
+                    payBtn.innerHTML='Pay with M-Pesa';
+                }
+                // FAILED
+                else if(data.payment_status==='Failed'){
+                    clearInterval(checkInterval);
+                    showFailedModal('Payment Failed. Check your PIN or balance and try again.');
+                    payBtn.disabled=false;
+                    payBtn.innerHTML='Pay with M-Pesa';
+                }
+                // TIMEOUT 90sec
+                else if(attempts>=30){
+                    clearInterval(checkInterval);
+                    showFailedModal('Request Timeout. You did not respond within 90 seconds.');
+                    payBtn.disabled=false;
+                    payBtn.innerHTML='Pay with M-Pesa';
+                }
+            })
+     .catch(function(){
+                if(attempts>=30){
+                    clearInterval(checkInterval);
+                    payBtn.disabled=false;
+                    payBtn.innerHTML='Pay with M-Pesa';
+                }
+            })
+        },3000)
+    }
     </script>
 </body>
-</html> 
+</html>
