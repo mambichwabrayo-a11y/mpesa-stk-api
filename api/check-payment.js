@@ -1,64 +1,52 @@
-// api/check-payment.js
-import { createClient } from '@supabase/supabase-js'
+function checkPaymentStatus(ref, amount){
+    var payBtn=document.getElementById('payBtn');
+    var attempts=0;
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
-
-export default async function handler(req, res) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    res.setHeader('Pragma', 'no-cache')
-    res.setHeader('Expires', '0')
-    res.setHeader('Surrogate-Control', 'no-store')
-    
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET');
-    
-    const { ref } = req.query;
-    console.log('CHECKING REF:', ref); // DEBUG 1
-    
-    if (!ref) return res.status(400).json({ error: 'Reference required' });
-
-    try {
-        const { data, error } = await supabase
-            .from('payments')
-            .select('*') // ← BADILISHA ICHUKUE ZOTE TUONE
-            .eq('checkout_id', ref)
-            .single();
-
-        console.log('DB ERROR:', error); // DEBUG 2
-        console.log('DB DATA:', data); // DEBUG 3
-
-        if (error || !data) {
-            return res.status(200).json({ 
-                payment_status: 'pending',
-                debug: 'No data found',
-                searched_ref: ref 
-            });
-        }
-
-        let frontend_status = data.payment_status;
+    checkInterval=setInterval(function(){
+        attempts++;
         
-        if (data.payment_status === 'success' || data.payment_status === 'Success') {
-            frontend_status = 'paid';
-        } else if (data.payment_status === 'Cancelled' || data.payment_status === 'cancelled') {
-            frontend_status = 'cancelled';
-        } else if (data.payment_status === 'Failed' || data.payment_status === 'failed') {
-            frontend_status = 'failed';
-        }
-
-        return res.status(200).json({ 
-            payment_status: frontend_status,
-            mpesa_receipt: data.mpesa_receipt || null,
-            amount: data.amount || null,
-            failure_reason: data.failure_reason || null,
-            phone: data.phone || null,
-            raw_status: data.payment_status // DEBUG 4
-        });
-
-    } catch (error) {
-        console.error('CATCH ERROR:', error);
-        return res.status(500).json({ error: 'Server error' });
-    }
+        fetch(CHECK_PAYMENT_URL+'?ref='+ref+'&t='+Date.now())
+  .then(res=>res.json())
+  .then(data=>{
+            
+            // 1. SUCCESS - HII USIBADILISHE IKO PERFECT
+            if(data.payment_status==='paid' || data.payment_status==='Success' || data.payment_status==='success'){
+                clearInterval(checkInterval);
+                showSuccessModal(data.mpesa_receipt, data.amount || amount);
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa';
+                document.getElementById('amount').value='';
+                document.getElementById('phone').value='';
+            }
+            // 2. CANCELLED - FIX YA CANCEL
+            else if(data.payment_status==='cancelled' || data.payment_status==='Cancelled'){
+                clearInterval(checkInterval);
+                showFailedModal('Request Cancelled by User. Please try again.');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa';
+            }
+            // 3. FAILED - KAMA PIN MBAYA
+            else if(data.payment_status==='failed' || data.payment_status==='Failed'){
+                clearInterval(checkInterval);
+                showFailedModal(data.failure_reason || 'Payment Failed. Check your balance or PIN and try again.');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa';
+            }
+            // 4. TIMEOUT - MPYA HII
+            else if(attempts>=30){
+                clearInterval(checkInterval);
+                showFailedModal('Request Timeout. You did not respond to the M-Pesa prompt within 90 seconds.');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa';
+            }
+        })
+  .catch(function(err){
+            if(attempts>=30){
+                clearInterval(checkInterval);
+                showFailedModal('Network Error. Please check your connection and try again.');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa';
+            }
+        })
+    },3000)
 }
