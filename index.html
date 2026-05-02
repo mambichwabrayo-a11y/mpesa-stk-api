@@ -334,51 +334,59 @@
             })
         }
     function checkPaymentStatus(ref, amount){
-            var payBtn=document.getElementById('payBtn');
-            var attempts=0;
+    var payBtn=document.getElementById('payBtn');
+    var attempts=0;
 
-            checkInterval=setInterval(function(){
-                attempts++;
-                fetch(CHECK_PAYMENT_URL+'?ref='+ref)
-    .then(res=>res.json())
-    .then(data=>{
-                    if(data.payment_status==='Success' || data.payment_status==='paid'){
-                        clearInterval(checkInterval);
-                        showSuccessModal(data.mpesa_receipt, data.amount || amount);
-                        payBtn.disabled=false;
-                        payBtn.innerHTML='Pay with M-Pesa';
-                        document.getElementById('amount').value='';
-                        document.getElementById('phone').value=''
-                    }
-                    else if(data.payment_status==='Cancelled' || data.payment_status==='cancelled'){
-                        clearInterval(checkInterval);
-                        showFailedModal('Request Cancelled by user.');
-                        payBtn.disabled=false;
-                        payBtn.innerHTML='Pay with M-Pesa'
-                    }
-                    else if(data.payment_status==='Failed' || data.payment_status==='failed'){
-                        clearInterval(checkInterval);
-                        showFailedModal(data.failure_reason || 'Payment failed. Please try again');
-                        payBtn.disabled=false;
-                        payBtn.innerHTML='Pay with M-Pesa'
-                    }
-                    else if(attempts>30){
-                        clearInterval(checkInterval);
-                        showFailedModal('Request timeout. Check your M-Pesa messages');
-                        payBtn.disabled=false;
-                        payBtn.innerHTML='Pay with M-Pesa'
-                    }
-                })
-    .catch(function(){
-                    if(attempts>30){
-                        clearInterval(checkInterval);
-                        showFailedModal('Network error. Please try again');
-                        payBtn.disabled=false;
-                        payBtn.innerHTML='Pay with M-Pesa'
-                    }
-                })
-            },3000)
-        }
+    checkInterval=setInterval(function(){
+        attempts++;
+        console.log('Checking payment:', ref, 'Attempt:', attempts); // DEBUG
+        
+        fetch(CHECK_PAYMENT_URL+'?ref='+ref+'&t='+Date.now()) // ← ADDED: &t= kuzuia cache
+  .then(res=>res.json())
+  .then(data=>{
+            console.log('Payment data:', data); // DEBUG - ANGALIA HII BROWSER
+            
+            // SUCCESS - ONA HAPA: Inacheck 'paid' NA 'Success' NA 'success'
+            if(data.payment_status==='paid' || data.payment_status==='Success' || data.payment_status==='success'){
+                clearInterval(checkInterval);
+                showSuccessModal(data.mpesa_receipt, data.amount || amount);
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa';
+                document.getElementById('amount').value='';
+                document.getElementById('phone').value=''
+            }
+            // CANCELLED
+            else if(data.payment_status==='cancelled' || data.payment_status==='Cancelled'){
+                clearInterval(checkInterval);
+                showFailedModal('Request Cancelled by user.');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa'
+            }
+            // FAILED
+            else if(data.payment_status==='failed' || data.payment_status==='Failed'){
+                clearInterval(checkInterval);
+                showFailedModal(data.failure_reason || 'Payment failed. Please try again');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa'
+            }
+            else if(attempts>30){
+                clearInterval(checkInterval);
+                showFailedModal('Request timeout. Check your M-Pesa messages');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa'
+            }
+        })
+  .catch(function(err){
+            console.log('Check payment error:', err); // DEBUG
+            if(attempts>30){
+                clearInterval(checkInterval);
+                showFailedModal('Network error. Please try again');
+                payBtn.disabled=false;
+                payBtn.innerHTML='Pay with M-Pesa'
+            }
+        })
+    },3000)
+}
     </script>
 </body>
 </html> 
