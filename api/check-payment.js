@@ -16,21 +16,27 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET');
     
     const { ref } = req.query;
+    console.log('CHECKING REF:', ref); // DEBUG 1
+    
     if (!ref) return res.status(400).json({ error: 'Reference required' });
 
     try {
         const { data, error } = await supabase
             .from('payments')
-            .select('payment_status, mpesa_receipt, amount, failure_reason, phone, CheckoutRequestID')
-            .eq('CheckoutRequestID', ref) // ← FIX KUBWA HAPA
+            .select('*') // ← BADILISHA ICHUKUE ZOTE TUONE
+            .eq('checkout_id', ref)
             .single();
 
-        if (error || !data) {
-            console.log('DB Error:', error);
-            return res.status(200).json({ payment_status: 'pending' });
-        }
+        console.log('DB ERROR:', error); // DEBUG 2
+        console.log('DB DATA:', data); // DEBUG 3
 
-        console.log('DB Data:', data); // DEBUG
+        if (error || !data) {
+            return res.status(200).json({ 
+                payment_status: 'pending',
+                debug: 'No data found',
+                searched_ref: ref 
+            });
+        }
 
         let frontend_status = data.payment_status;
         
@@ -47,11 +53,12 @@ export default async function handler(req, res) {
             mpesa_receipt: data.mpesa_receipt || null,
             amount: data.amount || null,
             failure_reason: data.failure_reason || null,
-            phone: data.phone || null
+            phone: data.phone || null,
+            raw_status: data.payment_status // DEBUG 4
         });
 
     } catch (error) {
-        console.error(error);
+        console.error('CATCH ERROR:', error);
         return res.status(500).json({ error: 'Server error' });
     }
 }
