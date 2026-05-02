@@ -67,22 +67,24 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('PayHero Response:', data);
     
+    // 1. CHECK KAMA TOKEN/AUTH IMESHAKA - MESSAGE YA KIINGEREZA
     if (response.status === 401) {
       await supabase
         .from('payments')
         .update({ 
           payment_status: 'failed',
-          failure_reason: 'Service temporarily unavailable. Please contact support.'
+          failure_reason: 'PayHero authentication failed'
         })
         .eq('checkout_id', checkout_id);
       
       return res.status(400).json({ 
         success: false, 
-        error: 'Payment service is temporarily unavailable. Please try again later.',
+        error: 'PayHero authentication failed. Please contact support.',
         code: 'AUTH_FAILED'
       });
     }
 
+    // 2. CHECK KAMA PAYMENT IMESHAKA/TOKEN ZIMEISHA - MESSAGE YA KIINGEREZA
     if (data.status === 'FAILED' || data.success === false) {
       const errorMsg = data.message || data.error || 'Payment request failed';
       
@@ -94,13 +96,15 @@ export default async function handler(req, res) {
         })
         .eq('checkout_id', checkout_id);
 
+      // HII NDIO ULITAKA - TOKEN ZIKIISHA
       if (errorMsg.toLowerCase().includes('insufficient') || 
           errorMsg.toLowerCase().includes('balance') || 
           errorMsg.toLowerCase().includes('token') ||
-          errorMsg.toLowerCase().includes('credit')) {
+          errorMsg.toLowerCase().includes('credit') ||
+          errorMsg.toLowerCase().includes('quota')) {
         return res.status(400).json({ 
           success: false, 
-          error: 'Payment service is temporarily unavailable. Please contact support.',
+          error: 'PayHero tokens depleted. Please top up your account.',
           code: 'INSUFFICIENT_TOKENS'
         });
       }
