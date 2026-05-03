@@ -14,19 +14,12 @@ export default async function handler(req, res) {
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-    const { error: dbError } = await supabase
-      .from('payments')
-      .insert({
-        amount: Number(amount),
-        phone: String(phone),
-        checkout_id: checkout_id,
-        payment_status: 'pending'
-      });
-
-    if (dbError) {
-      console.log('SUPABASE INSERT ERROR:', dbError);
-      return res.status(500).json({ success: false, error: dbError.message });
-    }
+    await supabase.from('payments').insert({
+      amount: Number(amount),
+      phone: String(phone),
+      checkout_id: checkout_id,
+      payment_status: 'pending'
+    });
 
     const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
 
@@ -38,23 +31,23 @@ export default async function handler(req, res) {
         phone_number: String(phone),
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
-        external_reference: checkout_id
+        external_reference: checkout_id,
+        callback_url: 'https://mpesa-stk-api.vercel.app/api/callback' // RUDISHA HII
       })
     });
 
     const data = await response.json();
     console.log('PayHero Response:', data);
     
-    if (response.status === 401 || data.success === false) {
-      const errorMsg = data.message || 'Payment failed';
+    if (data.success === false) {
       await supabase.from('payments').update({ payment_status: 'Failed' }).eq('checkout_id', checkout_id);
-      return res.status(400).json({ success: false, error: errorMsg });
+      return res.status(400).json({ success: false, error: data.message });
     }
 
     return res.status(200).json({ success: true, checkout_id: checkout_id, data: data });
     
   } catch (error) {
-    console.log('STK CRASH:', error.message);
+    console.log('STK ERROR:', error.message);
     return res.status(500).json({ success: false, error: 'Server error' });
   }
 }
