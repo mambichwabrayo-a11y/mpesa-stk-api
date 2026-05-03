@@ -44,7 +44,7 @@
             background:rgba(255,255,255,0.9);
             backdrop-filter:blur(20px);
             -webkit-backdrop-filter:blur(20px);
-            border:1px solid rgba(255,255,255,0.3);
+            border:1px solid rgba(255,255,0.3);
             border-radius:24px;
             box-shadow:0 20px 60px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.6);
             max-width:450px;
@@ -54,7 +54,7 @@
             z-index:1;
             margin:20px 0;
         }
-       .header{
+      .header{
             background:linear-gradient(135deg,#00a651 0%,#00703c 100%);
             padding:40px 30px;
             text-align:center;
@@ -350,19 +350,18 @@
             })
         }
 
-    // 3. CHECK PAYMENT STATUS - UPDATED
+    // 3. CHECK PAYMENT STATUS - UPDATED WITH 1.5s POLLING
     function checkPaymentStatus(ref, amount){
         var payBtn=document.getElementById('payBtn');
         var attempts=0;
 
-        checkInterval=setInterval(function(){
+        // FUNCTION YA KUCHECKA - TUMIA MARA MBILI
+        function doCheck(){
             attempts++;
 
-            fetch(CHECK_PAYMENT_URL+'?ref='+ref)
-     .then(res=>res.json())
-     .then(data=>{
-
-                // SUCCESS - HII IKO PERFECT
+            fetch(CHECK_PAYMENT_URL+'?ref='+ref+'&t='+Date.now())
+    .then(res=>res.json())
+    .then(data=>{
                 if(data.payment_status==='paid' || data.payment_status==='Success' || data.payment_status==='success'){
                     clearInterval(checkInterval);
                     showSuccessModal(data.mpesa_receipt, data.amount || amount);
@@ -371,36 +370,39 @@
                     document.getElementById('amount').value='';
                     document.getElementById('phone').value='';
                 }
-                // CANCELLED
-                else if(data.payment_status==='Cancelled'){
+                else if(data.payment_status==='Cancelled' || data.payment_status==='cancelled'){
                     clearInterval(checkInterval);
                     showFailedModal('Request Cancelled by User. Please try again.');
                     payBtn.disabled=false;
                     payBtn.innerHTML='Pay with M-Pesa';
                 }
-                // FAILED
-                else if(data.payment_status==='Failed'){
+                else if(data.payment_status==='Failed' || data.payment_status==='failed'){
                     clearInterval(checkInterval);
                     showFailedModal('Payment Failed. Check your PIN or balance and try again.');
                     payBtn.disabled=false;
                     payBtn.innerHTML='Pay with M-Pesa';
                 }
-                // TIMEOUT 90sec
-                else if(attempts>=30){
+                else if(attempts>=60){ // 60 * 1.5sec = 90sec
                     clearInterval(checkInterval);
                     showFailedModal('Request Timeout. You did not respond within 90 seconds.');
                     payBtn.disabled=false;
                     payBtn.innerHTML='Pay with M-Pesa';
                 }
             })
-     .catch(function(){
-                if(attempts>=30){
+    .catch(function(){
+                if(attempts>=60){
                     clearInterval(checkInterval);
                     payBtn.disabled=false;
                     payBtn.innerHTML='Pay with M-Pesa';
                 }
             })
-        },3000)
+        }
+
+        // CHECK MARA MOJA BAADA YA 1.5 SECONDS
+        setTimeout(doCheck, 1500);
+
+        // KISHA ENDELEA KUCHECKA KILA 1.5 SECONDS
+        checkInterval=setInterval(doCheck, 1500);
     }
     </script>
 </body>
