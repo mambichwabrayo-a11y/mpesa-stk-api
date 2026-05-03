@@ -1,68 +1,60 @@
 export default async function handler(req, res) {
-  // Log kila kitu PayHero anatuma
-  console.log('=== PAYHERO CALLBACK RECEIVED ===');
-  console.log('Method:', req.method);
-  console.log('Headers:', JSON.stringify(req.headers));
-  console.log('Body:', JSON.stringify(req.body, null, 2));
-  
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' });
 
   try {
+    const { phone, amount } = req.body;
+    if (!phone || !amount) return res.status(400).json({ error: 'Phone and amount required' });
+
+    const checkout_id = 'TXN-' + Date.now();
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    
-    const body = req.body;
-    
-    // PayHero hutuma data kwa njia 3 tofauti. Shika zote:
-    const ResultCode = body.ResultCode ?? body.response?.ResultCode ?? body.response?.ResultCode;
-    const ResultDesc = body.ResultDesc ?? body.response?.ResultDesc ?? 'No description';
-    const ExternalReference = 
-      body.external_reference || 
-      body.ExternalReference || 
-      body.response?.ExternalReference ||
-      body.response?.external_reference ||
-      body.reference;
-    
-    const MpesaReceiptNumber = body.MpesaReceiptNumber ?? body.response?.MpesaReceiptNumber;
-    const Amount = body.Amount ?? body.response?.Amount;
-    
-    console.log('EXTRACTED:', { ResultCode, ResultDesc, ExternalReference });
 
-    if (!ExternalReference) {
-      console.log('ERROR: No ExternalReference found');
-      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
-    }
-
-    // Update status
-    let payment_status = 'Failed';
-    if (ResultCode == 0) payment_status = 'success';
-    if (ResultCode == 1032) payment_status = 'Cancelled';
-    
-    console.log('Updating to:', payment_status);
-
-    const { data, error } = await supabase
+    const { error: dbError } = await supabase
       .from('payments')
-      .update({
-        payment_status: payment_status,
-        mpesa_receipt: MpesaReceiptNumber,
-        failure_reason: ResultDesc,
-        amount: Amount
-      })
-      .eq('checkout_id', ExternalReference)
-      .select();
+      .insert({
+        amount: Number(amount),
+        phone: String(phone),
+        checkout_id: checkout_id,
+        payment_status: 'pending'
+      });
 
-    if (error) {
-      console.log('SUPABASE ERROR:', error);
-    } else {
-      console.log('SUPABASE UPDATED:', data);
+    if (dbError) {
+      console.log('SUPABASE INSERT ERROR:', dbError);
+      return res.status(500).json({ success: false, error: dbError.message });
     }
 
-    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+    const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
 
-  } catch (err) {
-    console.error('CALLBACK ERROR:', err);
-    res.status(200).json({ ResultCode: 0, ResultDesc: 'Error but accepted' });
+    const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
+      method: 'POST',
+      headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: Number(amount),
+        phone_number: String(phone),
+        channel_id: Number(process.env.CHANNEL_ID),
+        provider: 'm-pesa',
+        external_reference: checkout_id
+      })
+    });
+
+    const data = await response.json();
+    console.log('PayHero Response:', data);
+    
+    if (response.status === 401 || data.success === false) {
+      const errorMsg = data.message || 'Payment failed';
+      await supabase.from('payments').update({ payment_status: 'Failed' }).eq('checkout_id', checkout_id);
+      return res.status(400).json({ success: false, error: errorMsg });
+    }
+
+    return res.status(200).json({ success: true, checkout_id: checkout_id, data: data });
+    
+  } catch (error) {
+    console.log('STK CRASH:', error.message);
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 }
