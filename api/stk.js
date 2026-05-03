@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' });
 
-  // CHECK ENV VARS
+  // CHECK ENV VARS KWANZA - HII INAZUIA CRASH
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || 
       !process.env.PAYHERO_USER || !process.env.PAYHERO_PASS || !process.env.CHANNEL_ID) {
     console.error('Missing environment variables');
@@ -23,7 +23,29 @@ export default async function handler(req, res) {
 
     const checkout_id = 'TXN-' + Date.now();
 
-    // 1. TUMA STK KWA PAYHERO KWANZA - HARAKA SANA
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
+    console.log('INSERTING PENDING TO SUPABASE:', checkout_id);
+    const { error: dbError } = await supabase
+      .from('payments')
+      .insert({
+        amount: Number(amount),
+        phone: String(phone),
+        checkout_id: checkout_id,
+        payment_status: 'pending'
+      });
+
+    if (dbError) {
+      console.log('!!! SUPABASE INSERT ERROR !!!', dbError.message);
+      return res.status(500).json({ success: false, db_error: dbError.message });
+    }
+    
+    console.log('PENDING ROW INSERTED:', checkout_id);
+
     const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
 
     const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
@@ -45,8 +67,16 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('PayHero Response:', data);
     
-    // 2. CHECK ERRORS ZA PAYHERO
+    // 1. CHECK KAMA TOKEN/AUTH IMESHAKA - MESSAGE YA KIINGEREZA
     if (response.status === 401) {
+      await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: 'PayHero authentication failed'
+        })
+        .eq('checkout_id', checkout_id);
+      
       return res.status(400).json({ 
         success: false, 
         error: 'PayHero authentication failed. Please contact support.',
@@ -54,9 +84,19 @@ export default async function handler(req, res) {
       });
     }
 
+    // 2. CHECK KAMA PAYMENT IMESHAKA/TOKEN ZIMEISHA - MESSAGE YA KIINGEREZA
     if (data.status === 'FAILED' || data.success === false) {
       const errorMsg = data.message || data.error || 'Payment request failed';
       
+      await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: errorMsg
+        })
+        .eq('checkout_id', checkout_id);
+
+      // HII NDIO ULITAKA - TOKEN ZIKIISHA
       if (errorMsg.toLowerCase().includes('insufficient') || 
           errorMsg.toLowerCase().includes('balance') || 
           errorMsg.toLowerCase().includes('token') ||
@@ -77,6 +117,14 @@ export default async function handler(req, res) {
     }
 
     if (!data.reference) {
+      await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'failed',
+          failure_reason: 'Payment gateway did not return a reference'
+        })
+        .eq('checkout_id', checkout_id);
+      
       return res.status(400).json({ 
         success: false, 
         error: 'Payment gateway error. Please try again.',
@@ -84,32 +132,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. RUDISHA RESPONSE KWA USER MARA MOJA - HAPA NDIO STK INATOKA HARAKA
-    res.status(200).json({ 
+    return res.status(200).json({ 
       success: true, 
       checkout_id: checkout_id,
       CheckoutRequestID: checkout_id,
       data: data 
     });
-
-    // 4. SASA NDIO SAVE KWA SUPABASE - USER HASHANGII
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
-
-    await supabase
-      .from('payments')
-      .insert({
-        amount: Number(amount),
-        phone: String(phone),
-        checkout_id: checkout_id,
-        payment_status: 'pending'
-      });
     
   } catch (error) {
     console.log('!!! STK CRASH ERROR !!!', error.message);
+    
     return res.status(500).json({ 
       success: false, 
       error: 'Server error occurred. Please try again.',
