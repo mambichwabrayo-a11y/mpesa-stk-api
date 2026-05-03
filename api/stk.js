@@ -1,151 +1,68 @@
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' });
-
-  // CHECK ENV VARS KWANZA - HII INAZUIA CRASH
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || 
-      !process.env.PAYHERO_USER || !process.env.PAYHERO_PASS || !process.env.CHANNEL_ID) {
-    console.error('Missing environment variables');
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Server configuration error. Please contact support.',
-      code: 'ENV_MISSING'
-    });
+  // Log kila kitu PayHero anatuma
+  console.log('=== PAYHERO CALLBACK RECEIVED ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', JSON.stringify(req.headers));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { phone, amount } = req.body;
-    if (!phone || !amount) return res.status(400).json({ error: 'Phone and amount are required' });
-
-    const checkout_id = 'TXN-' + Date.now();
-
     const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    
+    const body = req.body;
+    
+    // PayHero hutuma data kwa njia 3 tofauti. Shika zote:
+    const ResultCode = body.ResultCode ?? body.response?.ResultCode ?? body.response?.ResultCode;
+    const ResultDesc = body.ResultDesc ?? body.response?.ResultDesc ?? 'No description';
+    const ExternalReference = 
+      body.external_reference || 
+      body.ExternalReference || 
+      body.response?.ExternalReference ||
+      body.response?.external_reference ||
+      body.reference;
+    
+    const MpesaReceiptNumber = body.MpesaReceiptNumber ?? body.response?.MpesaReceiptNumber;
+    const Amount = body.Amount ?? body.response?.Amount;
+    
+    console.log('EXTRACTED:', { ResultCode, ResultDesc, ExternalReference });
 
-    console.log('INSERTING PENDING TO SUPABASE:', checkout_id);
-    const { error: dbError } = await supabase
+    if (!ExternalReference) {
+      console.log('ERROR: No ExternalReference found');
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
+
+    // Update status
+    let payment_status = 'Failed';
+    if (ResultCode == 0) payment_status = 'success';
+    if (ResultCode == 1032) payment_status = 'Cancelled';
+    
+    console.log('Updating to:', payment_status);
+
+    const { data, error } = await supabase
       .from('payments')
-      .insert({
-        amount: Number(amount),
-        phone: String(phone),
-        checkout_id: checkout_id,
-        payment_status: 'pending'
-      });
-
-    if (dbError) {
-      console.log('!!! SUPABASE INSERT ERROR !!!', dbError.message);
-      return res.status(500).json({ success: false, db_error: dbError.message });
-    }
-    
-    console.log('PENDING ROW INSERTED:', checkout_id);
-
-    const auth = Buffer.from(process.env.PAYHERO_USER + ':' + process.env.PAYHERO_PASS).toString('base64');
-
-    const response = await fetch('https://backend.payhero.co.ke/api/v2/payments', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + auth,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount: Number(amount),
-        phone_number: String(phone),
-        channel_id: Number(process.env.CHANNEL_ID),
-        provider: 'm-pesa',
-        external_reference: checkout_id
-        // NIMETOA: callback_url - PayHero atatumia ya Dashboard
+      .update({
+        payment_status: payment_status,
+        mpesa_receipt: MpesaReceiptNumber,
+        failure_reason: ResultDesc,
+        amount: Amount
       })
-    });
+      .eq('checkout_id', ExternalReference)
+      .select();
 
-    const data = await response.json();
-    console.log('PayHero Response:', data);
-    
-    // 1. CHECK KAMA TOKEN/AUTH IMESHAKA - MESSAGE YA KIINGEREZA
-    if (response.status === 401) {
-      await supabase
-        .from('payments')
-        .update({ 
-          payment_status: 'failed',
-          failure_reason: 'PayHero authentication failed'
-        })
-        .eq('checkout_id', checkout_id);
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: 'PayHero authentication failed. Please contact support.',
-        code: 'AUTH_FAILED'
-      });
+    if (error) {
+      console.log('SUPABASE ERROR:', error);
+    } else {
+      console.log('SUPABASE UPDATED:', data);
     }
 
-    // 2. CHECK KAMA PAYMENT IMESHAKA/TOKEN ZIMEISHA - MESSAGE YA KIINGEREZA
-    if (data.status === 'FAILED' || data.success === false) {
-      const errorMsg = data.message || data.error || 'Payment request failed';
-      
-      await supabase
-        .from('payments')
-        .update({ 
-          payment_status: 'failed',
-          failure_reason: errorMsg
-        })
-        .eq('checkout_id', checkout_id);
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
 
-      // HII NDIO ULITAKA - TOKEN ZIKIISHA
-      if (errorMsg.toLowerCase().includes('insufficient') || 
-          errorMsg.toLowerCase().includes('balance') || 
-          errorMsg.toLowerCase().includes('token') ||
-          errorMsg.toLowerCase().includes('credit') ||
-          errorMsg.toLowerCase().includes('quota')) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'PayHero tokens depleted. Please top up your account.',
-          code: 'INSUFFICIENT_TOKENS'
-        });
-      }
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: errorMsg,
-        code: 'PAYHERO_ERROR'
-      });
-    }
-
-    if (!data.reference) {
-      await supabase
-        .from('payments')
-        .update({ 
-          payment_status: 'failed',
-          failure_reason: 'Payment gateway did not return a reference'
-        })
-        .eq('checkout_id', checkout_id);
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Payment gateway error. Please try again.',
-        code: 'NO_REFERENCE'
-      });
-    }
-
-    return res.status(200).json({ 
-      success: true, 
-      checkout_id: checkout_id,
-      CheckoutRequestID: checkout_id,
-      data: data 
-    });
-    
-  } catch (error) {
-    console.log('!!! STK CRASH ERROR !!!', error.message);
-    
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Server error occurred. Please try again.',
-      code: 'SERVER_ERROR'
-    });
+  } catch (err) {
+    console.error('CALLBACK ERROR:', err);
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Error but accepted' });
   }
 }
