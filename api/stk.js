@@ -59,8 +59,8 @@ export default async function handler(req, res) {
         phone_number: String(phone),
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
-        external_reference: checkout_id,
-        callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
+        external_reference: checkout_id
+        // NIMETOA: callback_url - PayHero atatumia ya Dashboard
       })
     });
 
