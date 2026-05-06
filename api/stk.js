@@ -1,8 +1,9 @@
 export default async function handler(req, res) {
+  // ONGEZA HIZI 3 LINES
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST only' });
 
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
         channel_id: Number(process.env.CHANNEL_ID),
         provider: 'm-pesa',
         external_reference: checkout_id,
-        callback_url: 'https://mpesa-stk-api.vercel.app/api/callback' // RUDISHA HII
+        callback_url: 'https://mpesa-stk-api.vercel.app/api/callback'
       })
     });
 
