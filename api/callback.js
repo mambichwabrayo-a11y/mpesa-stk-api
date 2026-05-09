@@ -1,3 +1,6 @@
+<?php
+file_put_contents('PAYHERO_ALIFIKA.txt', 'Ndio, PayHero amepiga hapa');
+exit; // Hii inazima code ingine yote chini
 export default async function handler(req, res) {
   console.log('=== PAYHERO CALLBACK ===', JSON.stringify(req.body));
   if (req.method !== 'POST') return res.status(405).end();
