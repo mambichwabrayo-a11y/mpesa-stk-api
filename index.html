@@ -321,7 +321,7 @@
             var payBtn=document.getElementById('payBtn');
 
             if(!amount||amount<1){showStatus('Please enter a valid amount','error');return}
-            if(!phoneInput||phoneInput.length!==9||!/^[17]/.test(phoneInput)){showStatus('Weka namba sahihi: 7XXXXXXXX au 1XXXXXXXX','error');return}
+            if(!phoneInput||phoneInput.length!==9||!/^[17]/.test(phoneInput)){showStatus('Please put a valid phone number: 7XXXXXXXX or 1XXXXXXXX','error');return}
 
             payBtn.disabled=true;
             payBtn.innerHTML='Processing...';
