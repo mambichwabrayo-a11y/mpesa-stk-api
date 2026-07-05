@@ -1,409 +1,531 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>M-Pesa Payment Gateway</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        html,body{
-            touch-action:manipulation;
-        }
-        body{
-            font-family:'Inter',sans-serif;
-            background:linear-gradient(135deg,#00a651 0%,#00703c 100%);
-            background-attachment:fixed;
-            min-height:100vh;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            flex-direction:column;
-            padding:20px;
-            position:relative;
-        }
-        body::before,body::after{
-            content:'';
-            position:fixed;
-            border-radius:50%;
-            filter:blur(80px);
-            opacity:0.4;
-            z-index:0;
-        }
-        body::before{
-            width:300px;height:300px;
-            background:#00ff88;
-            top:-100px;left:-100px;
-        }
-        body::after{
-            width:250px;height:250px;
-            background:#00a651;
-            bottom:-80px;right:-80px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>M-Pesa Payment Gateway</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ── Reset ── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{touch-action:manipulation;min-height:100vh}
+
+/* ── Base ── */
+:root{
+  --green:#00E5A0;
+  --green-dark:#00a651;
+  --green-deep:#00703c;
+  --cyan:#00BCD4;
+  --red:#FF4D4D;
+  --amber:#FFD600;
+  --bg:#0A0C0F;
+  --card:#12171D;
+  --surface:#181D23;
+  --surface2:#1E2530;
+  --text:#F0F4F8;
+  --muted:#6B7A8D;
+  --border:#1E2A36;
+}
+
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  position:relative;
+  overflow-x:hidden;
+}
+
+/* ── Animated BG orbs ── */
+.orb{
+  position:fixed;border-radius:50%;filter:blur(80px);opacity:.15;z-index:0;pointer-events:none;
+  animation:float 8s ease-in-out infinite;
+}
+.orb-1{width:350px;height:350px;background:var(--green);top:-120px;left:-120px;animation-delay:0s}
+.orb-2{width:280px;height:280px;background:var(--cyan);bottom:-100px;right:-100px;animation-delay:3s}
+.orb-3{width:200px;height:200px;background:var(--green-dark);top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:1.5s}
+@keyframes float{
+  0%,100%{transform:translateY(0) scale(1)}
+  50%{transform:translateY(-20px) scale(1.05)}
+}
+.orb-3{animation:float2 10s ease-in-out infinite}
+@keyframes float2{
+  0%,100%{transform:translate(-50%,-50%) scale(1)}
+  50%{transform:translate(-50%,-55%) scale(1.08)}
+}
+
+/* ── Card ── */
 .container{
-            background:rgba(255,255,255,0.9);
-            backdrop-filter:blur(20px);
-            -webkit-backdrop-filter:blur(20px);
-            border:1px solid rgba(255,255,0.3);
-            border-radius:24px;
-            box-shadow:0 20px 60px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.6);
-            max-width:450px;
-            width:100%;
-            overflow:hidden;
-            position:relative;
-            z-index:1;
-            margin:20px 0;
-        }
-      .header{
-            background:linear-gradient(135deg,#00a651 0%,#00703c 100%);
-            padding:40px 30px;
-            text-align:center;
-            color:white;
-            position:relative;
-        }
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:28px;
+  max-width:440px;width:100%;
+  overflow:hidden;position:relative;z-index:1;
+  box-shadow:0 32px 80px rgba(0,0,0,0.6);
+}
+
+/* ── Header ── */
+.header{
+  background:linear-gradient(135deg,var(--green-dark) 0%,var(--green-deep) 100%);
+  padding:36px 28px 32px;
+  text-align:center;position:relative;overflow:hidden;
+}
+.header::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.1) 0%,transparent 60%);
+  pointer-events:none;
+}
 .header::after{
-            content:'';
-            position:absolute;
-            top:0;left:0;right:0;bottom:0;
-            background:linear-gradient(180deg,rgba(255,255,255,0.15) 0%,transparent 100%);
-            pointer-events:none;
-        }
-.header h1{font-size:28px;font-weight:700;margin-bottom:8px;position:relative}
-.header p{font-size:14px;opacity:0.9;position:relative}
+  content:'';position:absolute;
+  width:200px;height:200px;border-radius:50%;
+  background:rgba(255,255,255,.05);
+  top:-80px;right:-60px;
+}
 .mpesa-logo{
-            width:60px;height:60px;
-            background:rgba(255,255,255,0.95);
-            border-radius:50%;
-            margin:0 auto 15px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-weight:700;
-            color:#00a651;
-            font-size:24px;
-            box-shadow:0 4px 15px rgba(0,0,0,0.15);
-            position:relative;
-        }
-.form-body{padding:40px 30px}
-.form-group{margin-bottom:24px}
-.form-group label{display:block;font-size:14px;font-weight:600;color:#333;margin-bottom:8px}
+  width:64px;height:64px;
+  background:rgba(255,255,255,.95);
+  border-radius:20px;
+  margin:0 auto 16px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;color:var(--green-dark);font-size:26px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25);
+  position:relative;z-index:1;
+}
+.header h1{
+  font-size:24px;font-weight:800;
+  color:#fff;margin-bottom:6px;
+  position:relative;z-index:1;
+}
+.header p{
+  font-size:13px;color:rgba(255,255,255,.8);
+  position:relative;z-index:1;
+}
+.secure-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+  color:rgba(255,255,255,.9);
+  font-size:10px;font-weight:700;letter-spacing:.5px;
+  padding:4px 12px;border-radius:50px;
+  margin-top:10px;position:relative;z-index:1;
+}
+
+/* ── Form body ── */
+.form-body{padding:32px 28px 24px}
+
+/* ── Amount chips ── */
+.amount-chips{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  margin-bottom:16px;
+}
+.chip{
+  padding:10px 4px;border-radius:12px;
+  border:1px solid var(--border);
+  background:var(--surface);color:var(--muted);
+  font-size:12px;font-weight:700;cursor:pointer;
+  transition:.2s;text-align:center;
+}
+.chip:hover{border-color:var(--green);color:var(--green)}
+.chip.active{background:rgba(0,229,160,.12);border-color:var(--green);color:var(--green)}
+
+/* ── Form group ── */
+.form-group{margin-bottom:20px}
+.form-group label{
+  display:block;font-size:11px;font-weight:700;
+  color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+  margin-bottom:8px;
+}
+
+/* ── Input wrapper ── */
 .input-wrapper{position:relative}
 .input-prefix{
-            position:absolute;
-            left:16px;
-            top:50%;
-            transform:translateY(-50%);
-            color:#666;
-            font-weight:600;
-            font-size:16px;
-            pointer-events:none;
-            z-index:2;
-        }
-.input-prefix.phone-prefix{
-            color:#00a651;
-            font-weight:700;
-        }
-        input{
-            width:100%;
-            padding:14px 16px;
-            border:2px solid rgba(0,0,0,0.08);
-            border-radius:12px;
-            font-size:16px;
-            transition:all 0.3s;
-            background:rgba(255,255,255,0.7);
-        }
-        input.with-prefix{padding-left:60px}
-        input.phone-input{padding-left:70px}
-        input:focus{
-            outline:none;
-            border-color:#00a651;
-            box-shadow:0 0 0 4px rgba(0,166,81,0.1);
-            background:rgba(255,255,255,0.95);
-        }
-        button{
-            width:100%;
-            padding:16px;
-            background:linear-gradient(135deg,#00a651 0%,#00703c 100%);
-            color:white;
-            border:none;
-            border-radius:12px;
-            font-size:16px;
-            font-weight:700;
-            cursor:pointer;
-            transition:all 0.3s;
-            box-shadow:0 4px 15px rgba(0,166,81,0.3);
-        }
-        button:hover:not(:disabled){
-            transform:translateY(-2px);
-            box-shadow:0 10px 25px rgba(0,166,81,0.4)
-        }
-        button:disabled{
-            opacity:0.6;
-            cursor:not-allowed;
-            transform:none
-        }
-        #status{
-            margin-top:20px;
-            padding:16px;
-            border-radius:12px;
-            font-size:14px;
-            font-weight:500;
-            text-align:center;
-            display:none;
-            backdrop-filter:blur(10px);
-        }
-.success{background:rgba(212,237,218,0.9);color:#155724;border:1px solid #c3e6cb}
-.error{background:rgba(248,215,218,0.9);color:#721c24;border:1px solid #f5c6cb}
-.pending{background:rgba(255,243,205,0.9);color:#856404;border:1px solid #ffeaa7}
-.footer{
-            text-align:center;
-            padding:20px;
-            font-size:12px;
-            color:#333;
-            border-top:1px solid rgba(0,0,0,0.05);
-            background:rgba(255,255,255,0.5);
-        }
-.footer span.brand{
-            color:#00a651!important;
-            font-weight:700;
-        }
-.credit{
-            text-align:center;
-            margin:20px 0;
-            font-size:11px;
-            color:rgba(255,255,255,0.8);
-            font-weight:500;
-            position:relative;
-            z-index:1;
-        }
+  position:absolute;left:16px;top:50%;transform:translateY(-50%);
+  color:var(--green);font-weight:800;font-size:14px;
+  pointer-events:none;z-index:2;
+}
+.phone-flag{
+  position:absolute;left:16px;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:6px;
+  color:var(--green);font-weight:700;font-size:13px;
+  pointer-events:none;z-index:2;
+}
+
+input{
+  width:100%;padding:14px 16px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  font-size:16px;font-weight:600;
+  background:var(--surface);
+  color:var(--text);
+  outline:none;transition:.2s;
+  -webkit-appearance:none;
+}
+input.with-prefix{padding-left:52px}
+input.phone-input{padding-left:70px}
+input::placeholder{color:var(--muted);font-weight:500}
+input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.1);background:var(--surface2)}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+
+/* ── Pay button ── */
+#payBtn{
+  width:100%;padding:16px;
+  background:linear-gradient(135deg,var(--green) 0%,#00c87a 100%);
+  color:#000;border:none;border-radius:14px;
+  font-size:16px;font-weight:800;cursor:pointer;
+  transition:.2s;
+  box-shadow:0 8px 24px rgba(0,229,160,.3);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin-top:8px;
+}
+#payBtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,229,160,.4)}
+#payBtn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ── Status ── */
+#status{
+  margin-top:16px;padding:14px 16px;
+  border-radius:12px;font-size:13px;font-weight:600;
+  text-align:center;display:none;
+}
+.success{background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.25)}
+.error{background:rgba(255,77,77,.1);color:var(--red);border:1px solid rgba(255,77,77,.25)}
+.pending{background:rgba(255,214,0,.1);color:var(--amber);border:1px solid rgba(255,214,0,.25)}
+
+/* ── Spinner ── */
 .spinner{
-            border:3px solid #f3f3;
-            border-top:3px solid #00a651;
-            border-radius:50%;
-            width:20px;
-            height:20px;
-            animation:spin 1s linear infinite;
-            display:inline-block;
-            margin-right:8px;
-            vertical-align:middle
-        }
-        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-    </style>
+  border:2px solid var(--border);border-top:2px solid var(--green);
+  border-radius:50%;width:16px;height:16px;
+  animation:spin 1s linear infinite;
+  display:inline-block;vertical-align:middle;flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Footer ── */
+.footer{
+  padding:16px 28px;
+  border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:11px;color:var(--muted);font-weight:600;
+}
+.footer-dot{width:3px;height:3px;border-radius:50%;background:var(--border)}
+.footer span.brand{color:var(--green);font-weight:800}
+
+/* ── Credit ── */
+.credit{
+  margin-top:20px;font-size:11px;
+  color:var(--muted);font-weight:600;
+  text-align:center;position:relative;z-index:1;
+}
+
+/* ── Modal overlay ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(6px);
+  z-index:9999;
+  align-items:center;justify-content:center;
+  padding:20px;
+}
+.modal-overlay.show{display:flex}
+
+/* ── Modal box ── */
+.modal-box{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:24px;
+  max-width:400px;width:100%;
+  padding:32px 28px;
+  text-align:center;
+  box-shadow:0 32px 80px rgba(0,0,0,.7);
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── Modal icons ── */
+.modal-icon{
+  width:64px;height:64px;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 20px;font-size:28px;
+}
+.modal-icon.fail{background:rgba(255,77,77,.12)}
+.modal-icon.success{background:rgba(0,229,160,.12)}
+.modal-badge{
+  display:inline-flex;align-items:center;
+  font-size:10px;font-weight:800;letter-spacing:.8px;
+  padding:4px 12px;border-radius:50px;margin-bottom:14px;
+}
+.modal-badge.fail{background:rgba(255,77,77,.12);color:var(--red);border:1px solid rgba(255,77,77,.2)}
+.modal-badge.success{background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.2)}
+.modal-title{font-size:22px;font-weight:900;margin-bottom:8px}
+.modal-title.fail{color:var(--red)}
+.modal-title.success{color:var(--green)}
+.modal-text{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:24px}
+
+/* ── Success detail rows ── */
+.detail-row{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;
+}
+.detail-label{font-size:9px;font-weight:800;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.detail-value{font-size:16px;font-weight:800;color:var(--text)}
+
+/* ── Modal buttons ── */
+.modal-btn{
+  width:100%;padding:14px;border:none;border-radius:12px;
+  font-size:14px;font-weight:800;cursor:pointer;transition:.2s;margin-top:8px;
+}
+.modal-btn:first-of-type{margin-top:0}
+.modal-btn.primary-red{background:var(--red);color:#fff}
+.modal-btn.primary-green{background:var(--green);color:#000}
+.modal-btn.secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.modal-btn:hover{opacity:.88;transform:translateY(-1px)}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="mpesa-logo">M</div>
-            <h1>M-Pesa Payment</h1>
-            <p>Fast, Secure & Reliable</p>
-        </div>
 
-        <div class="form-body">
-            <div class="form-group">
-                <label for="amount">Enter Amount (KES)</label>
-                <div class="input-wrapper">
-                    <span class="input-prefix">KES</span>
-                    <input type="number" id="amount" class="with-prefix" placeholder="0.00" min="1" step="1">
-                </div>
-            </div>
+<!-- ── BG Orbs ── -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
 
-            <div class="form-group">
-                <label for="phone">M-Pesa Phone Number</label>
-                <div class="input-wrapper">
-                    <span class="input-prefix phone-prefix">254|</span>
-                    <input type="tel" id="phone" class="phone-input" placeholder="7XXXXXXXX" maxlength="9" inputmode="numeric" pattern="[17][0-9]{8}">
-                </div>
-            </div>
+<!-- ── Main Card ── -->
+<div class="container">
 
-            <button id="payBtn" onclick="initiatePayment()">Pay with M-Pesa</button>
-            <div id="status"></div>
-        </div>
+  <!-- Header -->
+  <div class="header">
+    <div class="mpesa-logo">M</div>
+    <h1>M-Pesa Payment</h1>
+    <p>Fast, Secure & Reliable</p>
+    <div class="secure-badge">🔒 SECURED BY PAYHERO</div>
+  </div>
 
-        <div class="footer">Powered by <span class="brand">Mpesa</span> | Secured by <span class="brand">Payhero</span></div>
-    </div>
+  <!-- Form -->
+  <div class="form-body">
 
-    <div class="credit">Designed by Consultant Digital Solutions</div>
-    <!-- FAILED MODAL -->
-    <div id="failedModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-      <div style="background:white; padding:30px; border-radius:12px; max-width:400px; width:90%; text-align:center; font-family:system-ui;">
-        <div style="background:#FEE2E2; width:60px; height:60px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
-          <span style="color:#DC2626; font-size:30px; font-weight:bold;">!</span>
-        </div>
-        <span style="background:#FEE2E2; color:#DC2626; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">FAILED</span>
-        <h2 style="color:#DC2626; margin:15px 0 10px; font-size:24px;">Payment Failed</h2>
-        <p id="failedText" style="color:#6B7280; margin-bottom:25px;">Request Cancelled by user.</p>
-        <button onclick="location.reload()" style="background:#DC2626; color:white; border:none; padding:12px 24px; border-radius:8px; width:100%; font-weight:600; margin-bottom:10px; cursor:pointer;">Retry Payment</button>
-        <button onclick="document.getElementById('failedModal').style.display='none'" style="background:white; color:#374151; border:1px solid #D1D5DB; padding:12px 24px; border-radius:8px; width:100%; font-weight:600; cursor:pointer;">Close</button>
+    <!-- Quick amount chips -->
+    <div class="form-group">
+      <label>Quick Select Amount</label>
+      <div class="amount-chips">
+        <div class="chip" onclick="selectChip(this, 100)">100</div>
+        <div class="chip" onclick="selectChip(this, 500)">500</div>
+        <div class="chip" onclick="selectChip(this, 1000)">1K</div>
+        <div class="chip" onclick="selectChip(this, 2000)">2K</div>
       </div>
     </div>
-    <!-- SUCCESS MODAL -->
-    <div id="successModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-      <div style="background:white; padding:30px; border-radius:12px; max-width:400px; width:90%; font-family:system-ui;">
-        <div style="background:#D1FAE5; width:60px; height:60px; border-radius:8px; display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
-          <span style="color:#059669; font-size:30px; font-weight:bold;">✓</span>
-        </div>
-        <div style="text-align:right; margin-top:-50px; margin-bottom:20px;">
-          <span style="background:#D1FAE5; color:#059669; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;">SUCCESS</span>
-        </div>
-        <h2 style="color:#059669; margin:0 0 10px; font-size:24px; text-align:center;">Payment Successful</h2>
-        <p style="color:#6B7280; margin-bottom:25px; text-align:center;">The service request is processed successfully.</p>
 
-        <div style="border:1px solid #E5E7EB; border-radius:8px; padding:12px 16px; margin-bottom:12px;">
-          <div style="color:#9CA3AF; font-size:12px; margin-bottom:4px;">TRANSACTION CODE</div>
-          <div id="txnCode" style="color:#111827; font-weight:600; font-size:16px;">UE17R2Z107</div>
-        </div>
-
-        <div style="border:1px solid #E5E7EB; border-radius:8px; padding:12px 16px; margin-bottom:25px;">
-          <div style="color:#9CA3AF; font-size:12px; margin-bottom:4px;">AMOUNT DELIVERED</div>
-          <div id="txnAmount" style="color:#111827; font-weight:600; font-size:16px;">KES 10</div>
-        </div>
-
-        <button onclick="document.getElementById('successModal').style.display='none'; location.reload()" style="background:#059669; color:white; border:none; padding:12px 24px; border-radius:8px; width:100%; font-weight:600; cursor:pointer;">Thank You</button>
+    <!-- Amount input -->
+    <div class="form-group">
+      <label>Enter Amount (KES)</label>
+      <div class="input-wrapper">
+        <span class="input-prefix">KES</span>
+        <input type="number" id="amount" class="with-prefix" placeholder="0.00" min="1" step="1"
+          oninput="clearChips()">
       </div>
     </div>
+
+    <!-- Phone input -->
+    <div class="form-group">
+      <label>M-Pesa Phone Number</label>
+      <div class="input-wrapper">
+        <span class="phone-flag">🇰🇪 254|</span>
+        <input type="tel" id="phone" class="phone-input" placeholder="7XXXXXXXX"
+          maxlength="9" inputmode="numeric" pattern="[17][0-9]{8}">
+      </div>
+    </div>
+
+    <!-- Pay button -->
+    <button id="payBtn" onclick="initiatePayment()">
+      <span>💳</span> Pay with M-Pesa
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Powered by <span class="brand">M-Pesa</span>
+    <div class="footer-dot"></div>
+    Secured by <span class="brand">Payhero</span>
+  </div>
+</div>
+
+<div class="credit">Designed by Consultant Digital Solutions</div>
+
+<!-- ── Failed Modal ── -->
+<div id="failedModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-icon fail">❌</div>
+    <div class="modal-badge fail">FAILED</div>
+    <div class="modal-title fail">Payment Failed</div>
+    <p id="failedText" class="modal-text">Request Cancelled by user.</p>
+    <button class="modal-btn primary-red" onclick="location.reload()">Retry Payment</button>
+    <button class="modal-btn secondary" onclick="document.getElementById('failedModal').classList.remove('show')">Close</button>
+  </div>
+</div>
+
+<!-- ── Success Modal ── -->
+<div id="successModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-icon success">✅</div>
+    <div class="modal-badge success">SUCCESS</div>
+    <div class="modal-title success">Payment Successful!</div>
+    <p class="modal-text">Your transaction has been processed successfully.</p>
+    <div class="detail-row">
+      <div class="detail-label">Transaction Code</div>
+      <div class="detail-value" id="txnCode">—</div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-label">Amount Paid</div>
+      <div class="detail-value" id="txnAmount">KES —</div>
+    </div>
+    <button class="modal-btn primary-green" onclick="document.getElementById('successModal').classList.remove('show');location.reload()">
+      Done — Thank You 🎉
+    </button>
+  </div>
+</div>
+
 <script>
-        // 1. URL YA API - UPDATED
-        var CHECK_PAYMENT_URL='https://mpesa-stk-api.vercel.app/api/check-payment';
-        var STK_PUSH_URL='/api/stk';
-        var checkInterval;
+// ── Original logic — fully preserved ─────────────────────────────────────────
+var CHECK_PAYMENT_URL = 'https://mpesa-stk-api.vercel.app/api/check-payment';
+var STK_PUSH_URL = '/api/stk';
+var checkInterval;
 
-        document.getElementById('amount').addEventListener('focus', function() {
-            setTimeout(() => this.scrollIntoView({behavior: 'smooth', block: 'center'}), 300);
-        });
-        document.getElementById('phone').addEventListener('focus', function() {
-            setTimeout(() => this.scrollIntoView({behavior: 'smooth', block: 'center'}), 300);
-        });
+// Quick chip selection — new UI helper
+function selectChip(el, amount) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('amount').value = amount;
+}
+function clearChips() {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+}
 
-        document.getElementById('phone').addEventListener('input', function(e) {
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
+// Auto-scroll on focus (original logic)
+document.getElementById('amount').addEventListener('focus', function() {
+  setTimeout(() => this.scrollIntoView({behavior:'smooth', block:'center'}), 300);
+});
+document.getElementById('phone').addEventListener('focus', function() {
+  setTimeout(() => this.scrollIntoView({behavior:'smooth', block:'center'}), 300);
+});
 
-        function showStatus(message,type,loading=false){
-            var statusDiv=document.getElementById('status');
-            statusDiv.style.display='block';
-            statusDiv.className=type;
-            if(loading){statusDiv.innerHTML='<span class="spinner"></span>'+message}
-            else{statusDiv.innerHTML=message}
-        }
+// Numbers only on phone (original logic)
+document.getElementById('phone').addEventListener('input', function() {
+  this.value = this.value.replace(/[^0-9]/g, '');
+});
 
-        // 2. FAILED MODAL FUNCTION - UPDATED
-        function showFailedModal(reason){
-            var failedModal = document.createElement('div');
-            failedModal.innerHTML = `
-            <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;">
-              <div style="background:white;padding:30px;border-radius:12px;text-align:center;max-width:350px;width:90%;">
-                <div style="width:60px;height:60px;background:#dc3545;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
-                  <svg width="30" height="30" fill="white" viewBox="0 0 24 24">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                  </svg>
-                </div>
-                <h2 style="color:#dc3545;margin:0 0 10px 0;">Payment Failed</h2>
-                <p style="color:#666;margin:0 0 20px 0;">${reason}</p>
-                <button onclick="this.closest('div').parentElement.remove()" style="background:#dc3545;color:white;border:none;padding:12px 30px;border-radius:8px;font-weight:bold;cursor:pointer;width:100%;">
-                  Try Again
-                </button>
-              </div>
-            </div>`;
-            document.body.appendChild(failedModal);
-        }
+// Show status (original logic)
+function showStatus(message, type, loading = false) {
+  var statusDiv = document.getElementById('status');
+  statusDiv.style.display = 'block';
+  statusDiv.className = type;
+  statusDiv.innerHTML = loading ? '<span class="spinner"></span> ' + message : message;
+}
 
-        function showSuccessModal(receipt, amount) {
-            document.getElementById('txnCode').innerText = receipt || 'N/A';
-            document.getElementById('txnAmount').innerText = 'KES ' + amount;
-            document.getElementById('successModal').style.display = 'flex';
-            document.getElementById('status').style.display = 'none';
-        }
+// Failed modal (original logic — updated to use new CSS)
+function showFailedModal(reason) {
+  document.getElementById('failedText').innerText = reason;
+  document.getElementById('failedModal').classList.add('show');
+}
 
-        function initiatePayment(){
-            var amount=document.getElementById('amount').value;
-            var phoneInput=document.getElementById('phone').value;
-            var phone = '254' + phoneInput;
-            var payBtn=document.getElementById('payBtn');
+// Success modal (original logic)
+function showSuccessModal(receipt, amount) {
+  document.getElementById('txnCode').innerText = receipt || 'N/A';
+  document.getElementById('txnAmount').innerText = 'KES ' + amount;
+  document.getElementById('successModal').classList.add('show');
+  document.getElementById('status').style.display = 'none';
+}
 
-            if(!amount||amount<1){showStatus('Please enter a valid amount','error');return}
-            if(!phoneInput||phoneInput.length!==9||!/^[17]/.test(phoneInput)){showStatus('Please put a valid phone number: 7XXXXXXXX or 1XXXXXXXX','error');return}
+// Initiate payment (original logic)
+function initiatePayment() {
+  var amount    = document.getElementById('amount').value;
+  var phoneInput = document.getElementById('phone').value;
+  var phone     = '254' + phoneInput;
+  var payBtn    = document.getElementById('payBtn');
 
-            payBtn.disabled=true;
-            payBtn.innerHTML='Processing...';
-            showStatus('Sending STK Push to your phone...','pending',true);
+  if (!amount || amount < 1) { showStatus('Please enter a valid amount', 'error'); return; }
+  if (!phoneInput || phoneInput.length !== 9 || !/^[17]/.test(phoneInput)) {
+    showStatus('Please put a valid phone number: 7XXXXXXXX or 1XXXXXXXX', 'error'); return;
+  }
 
-            fetch(STK_PUSH_URL,{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({amount:parseInt(amount),phone:phone})
-            })
-.then(res=>res.json())
-.then(data=>{
-                if(data.success && data.checkout_id){
-                    showStatus('STK Push sent! Enter your M-Pesa PIN on your phone','pending',true);
-                    checkPaymentStatus(data.checkout_id, amount)
-                }else{
-                    showFailedModal(data.error || 'Failed to initiate payment');
-                    payBtn.disabled=false;
-                    payBtn.innerHTML='Pay with M-Pesa'
-                }
-            })
-.catch(err=>{
-                showFailedModal('Error: ' + err.message);
-                payBtn.disabled=false;
-                payBtn.innerHTML='Pay with M-Pesa'
-            })
-        }
+  payBtn.disabled = true;
+  payBtn.innerHTML = '<span class="spinner"></span> Processing...';
+  showStatus('Sending STK Push to your phone...', 'pending', true);
 
-    // 3. CHECK PAYMENT STATUS - UPDATED WITH 1.5s POLLING
-    function checkPaymentStatus(ref, amount){
-        var payBtn=document.getElementById('payBtn');
-        var attempts=0;
-
-        // FUNCTION YA KUCHECKA - TUMIA MARA MBILI
-        function doCheck(){
-            attempts++;
-
-            fetch(CHECK_PAYMENT_URL+'?ref='+ref+'&t='+Date.now())
-    .then(res=>res.json())
-    .then(data=>{
-                if(data.payment_status==='paid' || data.payment_status==='Success' || data.payment_status==='success'){
-                    clearInterval(checkInterval);
-                    showSuccessModal(data.mpesa_receipt, data.amount || amount);
-                    payBtn.disabled=false;
-                    payBtn.innerHTML='Pay with M-Pesa';
-                    document.getElementById('amount').value='';
-                    document.getElementById('phone').value='';
-                }
-                else if(data.payment_status==='Cancelled' || data.payment_status==='cancelled'){
-                    clearInterval(checkInterval);
-                    showFailedModal('Request Cancelled by User. Please try again.');
-                    payBtn.disabled=false;
-                    payBtn.innerHTML='Pay with M-Pesa';
-                }
-                else if(data.payment_status==='Failed' || data.payment_status==='failed'){
-                    clearInterval(checkInterval);
-                    showFailedModal('Payment Failed. Check your PIN or balance and try again.');
-                    payBtn.disabled=false;
-                    payBtn.innerHTML='Pay with M-Pesa';
-                }
-                else if(attempts>=60){ // 60 * 1.5sec = 90sec
-                    clearInterval(checkInterval);
-                    showFailedModal('Request Timeout. You did not respond within 90 seconds.');
-                    payBtn.disabled=false;
-                    payBtn.innerHTML='Pay with M-Pesa';
-                }
-            })
-    .catch(function(){
-                if(attempts>=60){
-                    clearInterval(checkInterval);
-                    payBtn.disabled=false;
-                    payBtn.innerHTML='Pay with M-Pesa';
-                }
-            })
-        }
-
-        // CHECK MARA MOJA BAADA YA 1.5 SECONDS
-        setTimeout(doCheck, 1500);
-
-        // KISHA ENDELEA KUCHECKA KILA 1.5 SECONDS
-        checkInterval=setInterval(doCheck, 1500);
+  fetch(STK_PUSH_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({amount: parseInt(amount), phone: phone})
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success && data.checkout_id) {
+      showStatus('STK Push sent! Enter your M-Pesa PIN on your phone', 'pending', true);
+      checkPaymentStatus(data.checkout_id, amount);
+    } else {
+      showFailedModal(data.error || 'Failed to initiate payment');
+      payBtn.disabled = false;
+      payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
     }
-    </script>
+  })
+  .catch(err => {
+    showFailedModal('Error: ' + err.message);
+    payBtn.disabled = false;
+    payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
+  });
+}
+
+// Check payment status — 1.5s polling (original logic)
+function checkPaymentStatus(ref, amount) {
+  var payBtn = document.getElementById('payBtn');
+  var attempts = 0;
+
+  function doCheck() {
+    attempts++;
+    fetch(CHECK_PAYMENT_URL + '?ref=' + ref + '&t=' + Date.now())
+    .then(res => res.json())
+    .then(data => {
+      if (data.payment_status === 'paid' || data.payment_status === 'Success' || data.payment_status === 'success') {
+        clearInterval(checkInterval);
+        showSuccessModal(data.mpesa_receipt, data.amount || amount);
+        payBtn.disabled = false;
+        payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
+        document.getElementById('amount').value = '';
+        document.getElementById('phone').value  = '';
+      }
+      else if (data.payment_status === 'Cancelled' || data.payment_status === 'cancelled') {
+        clearInterval(checkInterval);
+        showFailedModal('Request Cancelled by User. Please try again.');
+        payBtn.disabled = false;
+        payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
+      }
+      else if (data.payment_status === 'Failed' || data.payment_status === 'failed') {
+        clearInterval(checkInterval);
+        showFailedModal('Payment Failed. Check your PIN or balance and try again.');
+        payBtn.disabled = false;
+        payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
+      }
+      else if (attempts >= 60) {
+        clearInterval(checkInterval);
+        showFailedModal('Request Timeout. You did not respond within 90 seconds.');
+        payBtn.disabled = false;
+        payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
+      }
+    })
+    .catch(function() {
+      if (attempts >= 60) {
+        clearInterval(checkInterval);
+        payBtn.disabled = false;
+        payBtn.innerHTML = '<span>💳</span> Pay with M-Pesa';
+      }
+    });
+  }
+
+  setTimeout(doCheck, 1500);
+  checkInterval = setInterval(doCheck, 1500);
+}
+</script>
 </body>
 </html>
