@@ -125,11 +125,11 @@ export default async function handler(req, res) {
       console.error('DARaja OAuth ERROR:', tokenData)
 
       await supabase
-        .from('payments')
-        .update({
-          payment_status: 'Failed',
-          failure_reason: 'Unable to authenticate with Safaricom Daraja'
-        })
+  .from('payments')
+  .update({
+    payment_status: 'Failed',
+    failure_reason: reason
+  })
         .eq('checkout_id', temporaryReference)
 
       return res.status(500).json({
