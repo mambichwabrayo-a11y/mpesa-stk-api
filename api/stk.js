@@ -128,7 +128,7 @@ export default async function handler(req, res) {
   .from('payments')
   .update({
     payment_status: 'Failed',
-    failure_reason: 'Unable to authenticate with Safaricom Daraja'
+    failure_reason: reason
   })
   .eq('checkout_id', temporaryReference)
 
