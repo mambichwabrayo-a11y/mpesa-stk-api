@@ -243,13 +243,12 @@ export default async function handler(req, res) {
         'Safaricom rejected STK Push request'
 
       await supabase
-        .from('payments')
-        .update({
-          payment_status: 'Failed',
-          failure_reason: reason,
-          updated_at: new Date().toISOString()
-        })
-        .eq('checkout_id', temporaryReference)
+  .from('payments')
+  .update({
+    payment_status: 'Failed',
+    failure_reason: 'Unable to authenticate with Safaricom Daraja'
+  })
+  .eq('checkout_id', temporaryReference)
 
       return res.status(400).json({
         success: false,
