@@ -117,9 +117,8 @@ export default async function handler(req, res) {
      * Build update data
      */
     const updateData = {
-      payment_status,
-      updated_at: new Date().toISOString()
-    }
+  payment_status
+}
 
     /*
      * Save successful transaction details
