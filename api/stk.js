@@ -144,6 +144,7 @@ export default async function handler(req, res) {
      */
     const shortcode = process.env.DARAJA_SHORTCODE
     const passkey = process.env.DARAJA_PASSKEY
+    const tillNumber = process.env.DARAJA_TILL_NUMBER
 
     if (!shortcode || !passkey) {
       console.error('Missing Daraja shortcode/passkey')
@@ -191,18 +192,18 @@ export default async function handler(req, res) {
       'https://mpesa-stk-api.vercel.app/api/callback'
 
     const stkPayload = {
-      BusinessShortCode: shortcode,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerBuyGoodsOnline',
-      Amount: numericAmount,
-      PartyA: phoneNumber,
-      PartyB: shortcode,
-      PhoneNumber: phoneNumber,
-      CallBackURL: callbackUrl,
-      AccountReference: temporaryReference,
-      TransactionDesc: 'M-Pesa Payment'
-    }
+  BusinessShortCode: tillNumber,
+  Password: password,
+  Timestamp: timestamp,
+  TransactionType: 'CustomerBuyGoodsOnline',
+  Amount: numericAmount,
+  PartyA: phoneNumber,
+  PartyB: tillNumber,
+  PhoneNumber: phoneNumber,
+  CallBackURL: callbackUrl,
+  AccountReference: temporaryReference,
+  TransactionDesc: 'M-Pesa Payment'
+}
 
     console.log('SENDING DARaja STK:', {
       amount: numericAmount,
