@@ -281,9 +281,8 @@ export default async function handler(req, res) {
     const { error: updateError } = await supabase
       .from('payments')
       .update({
-        checkout_id: darajaCheckoutRequestID,
-        updated_at: new Date().toISOString()
-      })
+  checkout_id: darajaCheckoutRequestID
+})
       .eq('checkout_id', temporaryReference)
 
     if (updateError) {
