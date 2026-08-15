@@ -194,7 +194,7 @@ export default async function handler(req, res) {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
+      TransactionType: 'CustomerBuyGoodsOnline',
       Amount: numericAmount,
       PartyA: phoneNumber,
       PartyB: shortcode,
